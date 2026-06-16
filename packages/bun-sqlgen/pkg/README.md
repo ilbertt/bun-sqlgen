@@ -148,6 +148,26 @@ SELECT count(*) AS total, note, details FROM ...
 `/* @skip */` opts a query out of generation entirely (for SQL too dynamic to
 describe — e.g. `UPDATE ... SET ${dynamic}` — which you type by hand).
 
+### Schema-level overrides via column comments
+
+When an override is a fact about the **column** rather than one query, declare it
+once in the schema with `COMMENT ON COLUMN` and the same `@notNull` / `@nullable`
+/ `@type` markers. It then applies to every query that selects that column —
+no per-query annotation:
+
+```sql
+-- a GENERATED column Postgres reports as nullable, but is always present:
+COMMENT ON COLUMN app.users.created_at IS 'Derived from the id. @notNull';
+-- give a jsonb column a precise shape everywhere it is selected:
+COMMENT ON COLUMN app.users.prefs IS '@type { theme: "light" | "dark" }';
+```
+
+Precedence is **per-query pragma → column comment → catalog/OID default**. A
+column comment sets the column's *base* nullability, so outer-join widening still
+applies on top (a `@notNull` column pulled through a `LEFT JOIN` is still nullable
+in that query). Prose and markers can share a comment — only the `@…` tokens are
+read, so the comment stays useful as documentation.
+
 ## Boundaries
 
 - **Dynamic fragments** composed at runtime (`sql\`... ${sql(cols)} ...\``) can't
