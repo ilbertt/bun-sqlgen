@@ -1,6 +1,6 @@
 {
   "name": "@ilbertt/bun-sqlgen",
-  "description": "SQL generation utilities for Bun's built-in SQL module",
+  "description": "Types generator for your Bun.sql queries",
   "version": "0.0.1",
   "author": "ilbertt",
   "repository": {

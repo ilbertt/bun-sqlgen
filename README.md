@@ -4,17 +4,6 @@ SQL generation utilities for [Bun](https://bun.sh), developed as a monorepo powe
 
 The published package is [`@ilbertt/bun-sqlgen`](./packages/bun-sqlgen/pkg/README.md).
 
-## Structure
-
-```
-packages/
-  bun-sqlgen/          # Publishable package -> @ilbertt/bun-sqlgen
-  pack-utils/          # Internal build utilities (private)
-  typescript-config/   # Shared TypeScript configuration (private)
-examples/
-  simple/              # Minimal example consuming @repo/bun-sqlgen
-```
-
 ## Requirements
 
 - [Bun](https://bun.sh)
@@ -40,7 +29,3 @@ bun --filter @repo/example-simple start
 - [commitlint](https://commitlint.js.org/) — conventional commit enforcement
 - [git-cliff](https://git-cliff.org/) — changelog generation and version bumping
 - [TypeScript](https://www.typescriptlang.org/) — shared config via `@repo/typescript-config`
-
-## License
-
-[Unlicense](https://unlicense.org/)
