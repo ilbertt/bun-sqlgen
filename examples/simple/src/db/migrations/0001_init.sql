@@ -1,9 +1,8 @@
--- Source of truth for the schema. NOT NULL lives here, which is how we get
--- nullability right (the Postgres describe protocol alone can't tell you).
+-- The schema is the source of truth for nullability (NOT NULL lives here).
 CREATE TABLE users (
   id           bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   email        text NOT NULL,
-  display_name text,                       -- nullable
+  display_name text,
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 
