@@ -1,8 +1,6 @@
 import { SQL } from 'bun';
 import { type ICountDealsResult, withTypes } from './queries.gen';
 
-// Wrap once: `sql.QueryName\`...\`` now resolves to the generated row type, while
-// the untyped `sql\`...\`` escape hatch and real methods keep working.
 const sql = withTypes(new SQL(Bun.env.DATABASE_URL ?? 'postgres://localhost/example'));
 
 // LEFT JOIN makes the NOT NULL `amount` nullable in the result.
