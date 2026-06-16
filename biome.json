@@ -12,7 +12,8 @@
       "!**/node_modules",
       "!**/dist",
       "!**/bun.lock",
-      "!**/*.lock"
+      "!**/*.lock",
+      "!**/*.gen.ts"
     ]
   },
   "formatter": {

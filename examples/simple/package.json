@@ -3,15 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target bun",
+    "build": "bun codegen && bun build src/index.ts --outdir dist --target bun",
+    "codegen": "bun-sqlgen generate 'src/**/*.ts' --migrations src/db/migrations",
+    "codegen:check": "bun-sqlgen generate 'src/**/*.ts' --migrations src/db/migrations --check",
     "check:types": "bun run --bun tsc",
     "start": "bun run src/index.ts"
   },
-  "dependencies": {
-    "@repo/bun-sqlgen": "workspace:*"
-  },
   "devDependencies": {
+    "@repo/bun-sqlgen": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "@types/bun": "^1.3.14",
     "typescript": "catalog:"
   },
   "imports": {

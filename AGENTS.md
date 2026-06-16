@@ -10,11 +10,11 @@ Bun + TypeScript monorepo for `@ilbertt/bun-sqlgen` (`packages/*`, `examples/*`)
 - **Commits:** Conventional Commits (commitlint)
 
 ## Code style
-
+bun 
 - No comments that restate what types and naming already say — only comment the non-obvious
 - Imports use `#*` subpath mapping (e.g. `import { foo } from '#services/foo'`)
 - Single source of truth — never duplicate keys, enum values, or type info that belongs to a class/module; derive from the source instead
-- Biome enforces `useMaxParams: 1` — wrap multiple params in an object
+- Biome enforces `useMaxParams: 1` — wrap multiple params in an object. Exception: callbacks whose signature we don't control (native functions like `.map((x, i) => …)`/`.forEach`, or an external dependency's API) — match the required shape and add a one-line `// biome-ignore lint/complexity/useMaxParams: …` rather than contorting the code to satisfy the rule
 - Only re-export from index files - Biome enforces that
 
 ## Validation
@@ -54,6 +54,10 @@ Releases are automated and driven by Conventional Commits:
 ## Bun version
 
 The Bun version is pinned in `.bun-version`. When bumping it, also update `engines.bun` in `packages/bun-sqlgen/pkg/package.json` so the published package advertises the matching minimum.
+
+## Pull requests
+
+Keep PR descriptions minimal — the diff is self-explanatory, so don't enumerate every change. State the intent in a line or two.
 
 ## Keeping this file up to date
 

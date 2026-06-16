@@ -14,12 +14,8 @@
     "bun": "^1.3.0",
     "node": "please-use-bun"
   },
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "bun": "./dist/index.js"
-    }
+  "bin": {
+    "bun-sqlgen": "./dist/main.js"
   },
   "files": [
     "dist/*",
@@ -27,5 +23,10 @@
     "README.md",
     "LICENSE"
   ],
-  "dependencies": {}
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.2",
+    "@parshjs/core": "^0.0.10",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
+  }
 }

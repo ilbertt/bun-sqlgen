@@ -2,19 +2,27 @@
   "name": "@repo/bun-sqlgen",
   "private": true,
   "type": "module",
+  "bin": {
+    "bun-sqlgen": "./src/main.ts"
+  },
   "scripts": {
     "build": "bun run build.ts",
-    "check:types": "bun run --bun tsc"
-  },
-  "exports": {
-    ".": "./src/index.ts"
+    "check:types": "bun run --bun tsc",
+    "codegen": "parsh-codegen generate --commands src/commands --out src/command-tree.gen.ts --eager"
   },
   "imports": {
     "#*": "./src/*"
   },
+  "dependencies": {
+    "@electric-sql/pglite": "catalog:",
+    "@parshjs/core": "^0.0.10",
+    "@repo/bun-sqlgen-core": "workspace:*",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  },
   "devDependencies": {
+    "@parshjs/codegen": "^0.0.5",
     "@repo/pack-utils": "workspace:*",
-    "@repo/typescript-config": "workspace:*",
-    "typescript": "catalog:"
+    "@repo/typescript-config": "workspace:*"
   }
 }

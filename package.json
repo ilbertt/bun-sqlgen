@@ -1,5 +1,5 @@
 {
-  "name": "bun-sqlgen",
+  "name": "bun-sqlgen-monorepo",
   "type": "module",
   "private": true,
   "scripts": {
@@ -16,7 +16,9 @@
       "examples/*"
     ],
     "catalog": {
-      "typescript": "^5.9.3"
+      "@electric-sql/pglite": "^0.5.2",
+      "typescript": "^5.9.3",
+      "zod": "^4.4.3"
     }
   },
   "devDependencies": {
