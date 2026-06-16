@@ -1,44 +1,33 @@
-import { sql } from 'bun';
-import type {
-  IGetDealDetailsResult,
-  IGetDealMetaResult,
-  IGetDealSummariesResult,
-  IGetUserDealsResult,
-  IListDealDetailsResult,
-  IListDealsResult,
-  IRecentDealsResult,
-  ISearchDealsResult,
-  IUnnamedQuery1Result,
-} from './queries.gen';
+import { SQL } from 'bun';
+import { type ICountDealsResult, withTypes } from './queries.gen';
+
+// Wrap once: `sql.QueryName\`...\`` now resolves to the generated row type, while
+// the untyped `sql\`...\`` escape hatch and real methods keep working.
+const sql = withTypes(new SQL(Bun.env.DATABASE_URL ?? 'postgres://localhost/example'));
 
 // LEFT JOIN makes the NOT NULL `amount` nullable in the result.
 export async function getUserDeals(userId: number) {
-  const rows = await sql<IGetUserDealsResult[]>`
-    /* @name getUserDeals */
+  return await sql.GetUserDeals`
     SELECT u.id, u.email, u.display_name, d.amount, u.updated_at
     FROM users u
     LEFT JOIN deals d ON d.user_id = u.id
     WHERE u.id = ${userId}
   `;
-  return rows;
 }
 
 // Simple single-table query: status is NOT NULL, so no `| null`.
 export async function listDeals(minAmount: number) {
-  const rows = await sql<IListDealsResult[]>`
-    /* @name listDeals */
+  return await sql.ListDeals`
     SELECT id, status, amount
     FROM deals
     WHERE amount >= ${minAmount}
   `;
-  return rows;
 }
 
 // CTE + INNER/LEFT joins + aliased base columns trace to their tables; aggregates
 // and computed expressions (COALESCE, COUNT, comparison) come back nullable.
 export async function getDealSummaries(userId: number) {
-  const rows = await sql<IGetDealSummariesResult[]>`
-    /* @name getDealSummaries */
+  return await sql.GetDealSummaries`
     WITH deal_payments AS (
       SELECT deal_id, SUM(amount) AS paid, COUNT(*) AS payment_count
       FROM payments
@@ -57,19 +46,16 @@ export async function getDealSummaries(userId: number) {
     LEFT JOIN deal_payments dp ON dp.deal_id = d.id
     WHERE u.id = ${userId}
   `;
-  return rows;
 }
 
 // Through a VIEW: the planner inlines it, so base columns still trace their
 // nullability; the view's computed `status_upper` is nullable.
 export async function listDealDetails(status: string) {
-  const rows = await sql<IListDealDetailsResult[]>`
-    /* @name listDealDetails */
+  return await sql.ListDealDetails`
     SELECT deal_id, status, amount, email, display_name, status_upper
     FROM deal_details
     WHERE status = ${status}
   `;
-  return rows;
 }
 
 // Composition: the `byStatus` fragment is inlined and its `${status}` numbered
@@ -77,53 +63,46 @@ export async function listDealDetails(status: string) {
 // biome-ignore lint/complexity/useMaxParams: example query function reads naturally with positional args
 export async function searchDeals(status: string, minAmount: number) {
   const byStatus = sql`status = ${status}`;
-  const rows = await sql<ISearchDealsResult[]>`
-    /* @name searchDeals */
+  return await sql.SearchDeals`
     SELECT id, status, amount
     FROM deals
     WHERE ${byStatus} AND amount >= ${minAmount}
   `;
-  return rows;
 }
 
 // Nested fragment inlining plus `sql("deals")` (identifier escape), resolved statically.
 const NOT_ARCHIVED = sql`status <> 'archived'`;
 export async function recentDeals(minAmount: number) {
   const filters = sql`${NOT_ARCHIVED} AND amount >= ${minAmount}`;
-  const rows = await sql<IRecentDealsResult[]>`
-    /* @name recentDeals */
+  return await sql.RecentDeals`
     SELECT id, status FROM ${sql('deals')} WHERE ${filters}
   `;
-  return rows;
 }
 
 // Catalog-resolved types: ENUM → literal union, text[]/int4[] → typed arrays, jsonb → `unknown`.
 export async function getDealMeta(dealId: number) {
-  const rows = await sql<IGetDealMetaResult[]>`
-    /* @name getDealMeta */
+  return await sql.GetDealMeta`
     SELECT id, stage, tags, details, scores
     FROM deal_meta
     WHERE deal_id = ${dealId}
   `;
-  return rows;
 }
 
 // `@type` gives the json column a precise shape; nullability still applies on top.
 export async function getDealDetails(dealId: number) {
-  const rows = await sql<IGetDealDetailsResult[]>`
-    /* @name getDealDetails */
+  return await sql.GetDealDetails`
     /* @type details { priority: number; notes: string } */
     SELECT id, details
     FROM deal_meta
     WHERE deal_id = ${dealId}
   `;
-  return rows;
 }
 
-// No `@name` → falls back to `IUnnamedQuery1Result` (a nudge to name it).
+// The explicit-generic escape hatch still works on the wrapped client: a `@name`
+// comment names the generated interface, which the module also exports.
 export async function countDeals() {
-  const rows = await sql<IUnnamedQuery1Result[]>`
+  return await sql<ICountDealsResult[]>`
+    /* @name countDeals */
     SELECT count(*) AS total FROM deals
   `;
-  return rows;
 }

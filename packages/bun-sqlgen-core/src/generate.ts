@@ -2,14 +2,17 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createDiscoverer } from '#discover.ts';
-import { emitFile } from '#emit.ts';
+import { emitModule } from '#emit.ts';
 import { createIntrospector } from '#introspect.ts';
 import { parseColumnComments, parseOverrides, resolveFields } from '#nullability.ts';
 import type { DiscoveredQuery, EmitModel, SqlgenConfig } from '#types.ts';
 
-// Suffix of the files we emit — used both to name outputs and to skip them on
-// re-runs, so they're never fed back in as query sources.
-const GENERATED_SUFFIX = '.gen.d.ts';
+// Where the aggregated module lands when `--out` is omitted.
+const DEFAULT_OUT = 'src/queries.gen.ts';
+
+// Our own output, never fed back in as a query source: the aggregated module
+// (`*.gen.ts`) and any legacy per-file siblings (`*.gen.d.ts`).
+const isGenerated = (f: string): boolean => f.endsWith('.gen.ts') || f.endsWith('.gen.d.ts');
 
 export interface GenerateOptions {
   /** Glob(s) for query source files, e.g. `src/**\/*.ts`. Relative to `cwd`. */
@@ -20,6 +23,8 @@ export interface GenerateOptions {
   check?: boolean;
   /** Explicit path to `sqlgen.config.{ts,js,mjs}`; auto-discovered otherwise. */
   configPath?: string;
+  /** Output path for the aggregated module, relative to `cwd`. Defaults to `src/queries.gen.ts`. */
+  out?: string;
   /** Base directory for globs, migrations, and tsconfig lookup. Defaults to cwd. */
   cwd?: string;
 }
@@ -55,8 +60,10 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   const config = await loadConfig({ root: cwd, explicit: options.configPath });
 
   const migrationsDir = resolve(cwd, options.migrations);
+  const outPath = resolve(cwd, options.out ?? DEFAULT_OUT);
 
-  // Resolve the query globs; skip only our own generated output.
+  // Resolve the query globs; skip our own generated output (the aggregated module
+  // and any legacy per-file siblings).
   const globs = Array.isArray(options.queries) ? options.queries : [options.queries];
   const matched = new Set<string>();
   for (const pattern of globs) {
@@ -64,7 +71,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
       matched.add(f);
     }
   }
-  const sourceFiles = [...matched].filter((f) => !f.endsWith(GENERATED_SUFFIX));
+  const sourceFiles = [...matched].filter((f) => f !== outPath && !isGenerated(f));
 
   const intro = await createIntrospector({
     migrationsDir,
@@ -80,64 +87,46 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   // `writable` lets SET-clause neutralization self-assign a real column.
   const discover = createDiscoverer({ projectRoot: cwd, files: sourceFiles, writable });
 
-  const writes: Array<{ path: string; contents: string }> = [];
   const failures: GenerateFailure[] = [];
-  let typed = 0;
   let skipped = 0;
 
+  // All queries feed one aggregated module, so names are unique project-wide and
+  // unnamed queries are numbered across files.
+  const discovered: Array<{ q: DiscoveredQuery; file: string }> = [];
+  for (const file of sourceFiles) {
+    for (const q of discover(file)) {
+      if (q.skip) {
+        skipped++;
+      } else {
+        discovered.push({ q, file });
+      }
+    }
+  }
+  assignNames(discovered);
+
+  const emitModels: EmitModel[] = [];
   try {
-    for (const file of sourceFiles) {
-      const queries = discover(file).filter((q) => {
-        if (q.skip) {
-          skipped++;
-        }
-        return !q.skip;
-      });
-      if (queries.length === 0) {
-        continue;
-      }
-
-      requireUniqueNames({ queries, file: basename(file) });
-
-      const emitModels: EmitModel[] = [];
-      for (const q of queries) {
-        let described: Awaited<ReturnType<typeof intro.describe>>;
-        try {
-          described = await intro.describe(q.sql);
-        } catch (e) {
-          failures.push({
-            name: q.name,
-            file: basename(file),
-            line: q.line,
-            error: firstLine(e),
-            sql: q.sql,
-          });
-          continue; // type what we can; report the rest in the summary
-        }
-        const overrides = parseOverrides(q.sql);
-        const resultFields = resolveFields({
-          described,
-          catalog,
-          overrides,
-          columnOverrides,
-          types,
-        });
-        emitModels.push({
+    for (const { q, file } of discovered) {
+      let described: Awaited<ReturnType<typeof intro.describe>>;
+      try {
+        described = await intro.describe(q.sql);
+      } catch (e) {
+        failures.push({
           name: q.name,
-          explicit: q.explicit,
-          resultFields,
-          neutralized: q.neutralized,
+          file: basename(file),
+          line: q.line,
+          error: firstLine(e),
+          sql: q.sql,
         });
-        typed++;
+        continue; // type what we can; report the rest in the summary
       }
-      if (emitModels.length === 0) {
-        continue;
-      }
-
-      const genPath = file.replace(/\.ts$/, GENERATED_SUFFIX);
-      writes.push({
-        path: genPath,
-        contents: emitFile({ relSourcePath: relative(cwd, file), queries: emitModels }),
+      const overrides = parseOverrides(q.sql);
+      const resultFields = resolveFields({ described, catalog, overrides, columnOverrides, types });
+      emitModels.push({
+        name: q.name,
+        explicit: q.explicit,
+        resultFields,
+        neutralized: q.neutralized,
       });
     }
   } finally {
@@ -153,14 +142,16 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     }
   }
 
+  const typed = emitModels.length;
   let changed = false;
-  for (const w of writes) {
-    if (safeRead(w.path) !== w.contents) {
+  if (typed > 0) {
+    const contents = emitModule({ queries: emitModels });
+    if (safeRead(outPath) !== contents) {
       changed = true;
       if (check) {
-        console.error(`would change: ${relative(cwd, w.path)}`);
+        console.error(`would change: ${relative(cwd, outPath)}`);
       } else {
-        writeFileSync(w.path, w.contents);
+        writeFileSync(outPath, contents);
       }
     }
   }
@@ -180,19 +171,27 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
 
 // ---- helpers ----------------------------------------------------------------
 
-// Two queries sharing a `@name` would emit clashing interfaces.
-function requireUniqueNames(input: { queries: DiscoveredQuery[]; file: string }): void {
-  const seen = new Set<string>();
-  for (const q of input.queries) {
-    if (seen.has(q.name)) {
+// Number unnamed queries (`name === ''`) across the whole project, and reject two
+// named queries sharing a name — both would emit clashing interfaces / registry keys.
+function assignNames(discovered: Array<{ q: DiscoveredQuery; file: string }>): void {
+  const seen = new Map<string, string>();
+  let unnamed = 0;
+  for (const { q, file } of discovered) {
+    if (!q.name) {
+      q.name = `UnnamedQuery${++unnamed}`;
+      continue;
+    }
+    const at = `${basename(file)}:${q.line}`;
+    const prev = seen.get(q.name);
+    if (prev) {
       const preview = q.sql.trim().replace(/\s+/g, ' ').slice(0, SQL_PREVIEW_SHORT);
       throw new Error(
-        `${input.file}:${q.line} — duplicate query name "${q.name}"\n` +
+        `duplicate query name "${q.name}" (${prev} and ${at})\n` +
           `  ${preview}…\n` +
-          '  Give each query a distinct  /* @name MyQuery */',
+          '  Names must be unique: rename the property or the /* @name MyQuery */.',
       );
     }
-    seen.add(q.name);
+    seen.set(q.name, at);
   }
 }
 

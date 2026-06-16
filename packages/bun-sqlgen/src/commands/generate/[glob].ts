@@ -14,6 +14,10 @@ export const command = defineCommand('generate [glob]', {
       schema: z.string(),
       description: 'Migrations directory (required).',
     },
+    out: {
+      schema: z.string().optional(),
+      description: 'Output path for the generated module (default src/queries.gen.ts).',
+    },
     config: {
       schema: z.string().optional(),
       description: 'Path to sqlgen.config.{ts,js,mjs} (auto-discovered otherwise).',
@@ -27,6 +31,7 @@ export const command = defineCommand('generate [glob]', {
     const result = await generate({
       queries: params.glob,
       migrations: options.migrations,
+      out: options.out,
       configPath: options.config,
       check: options.check,
     });

@@ -7,7 +7,12 @@ import type { DiscoveredQuery, WritableColumns } from '#types.ts';
  * `sql\`...\`` fragment is inlined recursively; everything else becomes a
  * positional `$n`. One shared counter walks left-to-right, matching how Bun
  * flattens params at runtime. Tag detection is semantic — the checker confirms a
- * tag's type is Bun's `SQL` — so aliases/re-exports/`Bun.sql` all resolve.
+ * tag's type is Bun's `SQL` (or our `withTypes` wrapper, an intersection over it)
+ * — so aliases/re-exports/`Bun.sql`/wrapped clients all resolve.
+ *
+ * Two query forms are recognized:
+ *   - explicit generic: `sql<Row[]>\`...\`` — name from a `@name` comment.
+ *   - named tag:        `sql.MyQuery\`...\`` — name from the property.
  */
 const COMPILER_OPTIONS: ts.CompilerOptions = {
   target: ts.ScriptTarget.ES2022,
@@ -88,18 +93,31 @@ function discover(input: {
     ts.forEachChild(node, collect);
   })(sf);
 
-  // Queries carry result type args (`sql<Row[]>`); a bare `sql\`...\`` is just a fragment.
-  const queries: ts.TaggedTemplateExpression[] = [];
+  // Identifiers/fields bound to a typed-SQL client, so `sql.Name\`...\`` is found on
+  // the very first run too — before the generated module exists and the checker can
+  // see the wrapper type.
+  const bindings = collectTypedSqlBindings({ sf, checker });
+
+  // Two query forms: explicit generic (`sql<Row[]>`) and named tag (`sql.Name`).
+  // A bare `sql\`...\`` (no generic, no property) is a composable fragment.
+  const found: Array<{ node: ts.TaggedTemplateExpression; name: string; explicit: boolean }> = [];
   (function scan(node: ts.Node): void {
-    if (isSql(node) && node.typeArguments?.length) {
-      queries.push(node);
+    if (ts.isTaggedTemplateExpression(node)) {
+      if (isSql(node) && node.typeArguments?.length) {
+        const name = explicitName({ node, sf });
+        found.push({ node, name: name ?? '', explicit: !!name });
+      } else {
+        const named = namedTag({ node, checker, bindings });
+        if (named) {
+          found.push({ node, name: named, explicit: true });
+        }
+      }
     }
     ts.forEachChild(node, scan);
   })(sf);
 
   const out: DiscoveredQuery[] = [];
-  let unnamed = 0;
-  for (const node of queries) {
+  for (const { node, name, explicit } of found) {
     const ctx: DiscoverCtx = {
       symbols,
       paramCount: 0,
@@ -108,11 +126,10 @@ function discover(input: {
       checker,
       writable,
     };
-    const explicit = explicitName({ node, sf });
     const sql = expand({ tpl: node.template, ctx });
     out.push({
-      name: explicit ?? `UnnamedQuery${++unnamed}`,
-      explicit: !!explicit,
+      name,
+      explicit,
       sql,
       paramCount: ctx.paramCount,
       neutralized: !!ctx.neutralized,
@@ -121,6 +138,126 @@ function discover(input: {
     });
   }
   return out;
+}
+
+interface TypedSqlBindings {
+  vars: Set<string>;
+  fields: Set<string>;
+}
+
+// `sql.MyQuery\`...\``: a property-access tag whose object is a typed-SQL client and
+// whose property isn't a real Bun `SQL` member (so `sql.begin\`...\`` is left alone).
+function namedTag(input: {
+  node: ts.TaggedTemplateExpression;
+  checker: ts.TypeChecker;
+  bindings: TypedSqlBindings;
+}): string | null {
+  const { node, checker, bindings } = input;
+  const tag = node.tag;
+  if (!ts.isPropertyAccessExpression(tag) || !ts.isIdentifier(tag.name)) {
+    return null;
+  }
+  const obj = tag.expression;
+  if (
+    !isTypedSqlObject({ obj, checker, bindings }) ||
+    isBunSqlMember({ obj, name: tag.name.text, checker })
+  ) {
+    return null;
+  }
+  return tag.name.text;
+}
+
+// Is `obj` a typed-SQL client — by type (steady state) or by a tracked binding
+// (first run, before the wrapper type resolves)?
+function isTypedSqlObject(input: {
+  obj: ts.Expression;
+  checker: ts.TypeChecker;
+  bindings: TypedSqlBindings;
+}): boolean {
+  const { obj, checker, bindings } = input;
+  if (isBunSqlType({ expr: obj, checker })) {
+    return true;
+  }
+  if (ts.isIdentifier(obj)) {
+    return bindings.vars.has(obj.text);
+  }
+  if (ts.isPropertyAccessExpression(obj) && ts.isIdentifier(obj.name)) {
+    return bindings.fields.has(obj.name.text);
+  }
+  return false;
+}
+
+// True when `name` resolves to a property declared by Bun's `SQL` type (a real
+// method like `begin`), so it's never a generated query name.
+function isBunSqlMember(input: {
+  obj: ts.Expression;
+  name: string;
+  checker: ts.TypeChecker;
+}): boolean {
+  const type = input.checker.getTypeAtLocation(input.obj);
+  const prop = type.getProperty?.(input.name);
+  return (prop?.getDeclarations() ?? []).some((d) => isBunSqlFile(d.getSourceFile().fileName));
+}
+
+// Collect identifiers/class fields that hold a typed-SQL client: `withTypes(...)`,
+// `new SQL(...)`, or a field annotated with the `TypedSQL` wrapper type.
+function collectTypedSqlBindings(input: {
+  sf: ts.SourceFile;
+  checker: ts.TypeChecker;
+}): TypedSqlBindings {
+  const { sf, checker } = input;
+  const vars = new Set<string>();
+  const fields = new Set<string>();
+  const isInit = (e: ts.Expression | undefined): boolean =>
+    !!e && isTypedSqlInit({ expr: e, checker });
+  (function walk(node: ts.Node): void {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && isInit(node.initializer)) {
+      vars.add(node.name.text);
+    } else if (ts.isPropertyDeclaration(node) && ts.isIdentifier(node.name)) {
+      if (isInit(node.initializer) || (node.type && mentionsTypedSql(node.type))) {
+        fields.add(node.name.text);
+      }
+    } else if (
+      ts.isParameter(node) &&
+      ts.isIdentifier(node.name) &&
+      node.type &&
+      mentionsTypedSql(node.type)
+    ) {
+      fields.add(node.name.text);
+    } else if (isThisAssignment(node) && isInit(node.right)) {
+      fields.add(node.left.name.text);
+    }
+    ts.forEachChild(node, walk);
+  })(sf);
+  return { vars, fields };
+}
+
+function isThisAssignment(
+  node: ts.Node,
+): node is ts.BinaryExpression & { left: ts.PropertyAccessExpression & { name: ts.Identifier } } {
+  return (
+    ts.isBinaryExpression(node) &&
+    node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+    ts.isPropertyAccessExpression(node.left) &&
+    node.left.expression.kind === ts.SyntaxKind.ThisKeyword &&
+    ts.isIdentifier(node.left.name)
+  );
+}
+
+// `withTypes(...)` or `new SQL(...)` — what a typed-SQL client is constructed from.
+function isTypedSqlInit(input: { expr: ts.Expression; checker: ts.TypeChecker }): boolean {
+  const { expr, checker } = input;
+  if (ts.isCallExpression(expr) && ts.isIdentifier(expr.expression)) {
+    return expr.expression.text === 'withTypes';
+  }
+  if (ts.isNewExpression(expr)) {
+    return isBunSqlType({ expr: expr.expression, checker });
+  }
+  return false;
+}
+
+function mentionsTypedSql(typeNode: ts.TypeNode): boolean {
+  return /\bTypedSQL\b/.test(typeNode.getText());
 }
 
 // Render a template to static SQL, threading the param counter and SQL-so-far
@@ -253,18 +390,26 @@ function identifierOf(call: ts.Expression): string {
   return (arg as ts.StringLiteralLike).text;
 }
 
-// Does this expression carry Bun's `SQL` type? (its declaring symbol is `SQL` from
-// bun-types/@types/bun) — robust to how the tag was imported/aliased/re-exported.
+function isBunSqlFile(fileName: string): boolean {
+  return fileName.includes('bun-types') || fileName.includes('@types/bun');
+}
+
+// Does this expression carry Bun's `SQL` type (its declaring symbol is `SQL` from
+// bun-types/@types/bun)? Robust to how the tag was imported/aliased/re-exported,
+// and to our `withTypes` wrapper, whose type is an intersection over `SQL`.
 function isBunSqlType(input: { expr: ts.Expression; checker: ts.TypeChecker }): boolean {
-  const type = input.checker.getTypeAtLocation(input.expr);
+  return typeIsBunSql(input.checker.getTypeAtLocation(input.expr));
+}
+
+function typeIsBunSql(type: ts.Type): boolean {
   const sym = type.getSymbol() ?? type.aliasSymbol;
-  if (sym?.getName() !== 'SQL') {
-    return false;
+  if (
+    sym?.getName() === 'SQL' &&
+    (sym.getDeclarations() ?? []).some((d) => isBunSqlFile(d.getSourceFile().fileName))
+  ) {
+    return true;
   }
-  return (sym.getDeclarations() ?? []).some((d) => {
-    const f = d.getSourceFile().fileName;
-    return f.includes('bun-types') || f.includes('@types/bun');
-  });
+  return type.isIntersection() && type.types.some(typeIsBunSql);
 }
 
 const NAME_PRAGMA = /@name\s+(\w+)/;

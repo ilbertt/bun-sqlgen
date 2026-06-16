@@ -20,11 +20,10 @@ bun install
 bun run build
 ```
 
-Try the codegen on the example, then run it:
+Try the codegen on the example:
 
 ```sh
-bun --filter @repo/example-simple codegen   # bun-sqlgen generate .
-bun --filter @repo/example-simple start
+bun --filter @repo/example-simple codegen   # regenerates examples/simple/src/queries.gen.ts
 ```
 
 ## Tooling
