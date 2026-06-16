@@ -92,6 +92,7 @@ export interface DiscoveredQuery {
 
 export interface EmitModel {
   name: string;
+  explicit: boolean;
   resultFields: ResolvedField[];
   neutralized: boolean;
 }

@@ -122,7 +122,12 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
           columnOverrides,
           types,
         });
-        emitModels.push({ name: q.name, resultFields, neutralized: q.neutralized });
+        emitModels.push({
+          name: q.name,
+          explicit: q.explicit,
+          resultFields,
+          neutralized: q.neutralized,
+        });
         typed++;
       }
       if (emitModels.length === 0) {

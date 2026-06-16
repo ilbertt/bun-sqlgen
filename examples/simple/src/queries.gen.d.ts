@@ -66,7 +66,7 @@ export interface IGetDealDetailsResult {
   details: { priority: number; notes: string } | null;
 }
 
-/** Generated from query `UnnamedQuery1` — do not edit. */
+/** Do not edit. */
 export interface IUnnamedQuery1Result {
   total: string | null;
 }

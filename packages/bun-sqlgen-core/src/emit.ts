@@ -7,7 +7,11 @@ export const resultName = (name: string): string => `I${cap(name)}Result`;
 
 export function emitQueryTypes(q: EmitModel): string {
   const lines: string[] = [];
-  lines.push(`/** Generated from query \`${q.name}\` — do not edit. */`);
+  // Only name the query when it carries an explicit `@name`; the positional
+  // `UnnamedQueryN` fallback isn't worth surfacing.
+  lines.push(
+    q.explicit ? `/** Generated from query \`${q.name}\` — do not edit. */` : '/** Do not edit. */',
+  );
   if (q.neutralized) {
     lines.push('// NOTE: dynamic clauses (composed fragments) were neutralized for typing;');
     lines.push(
