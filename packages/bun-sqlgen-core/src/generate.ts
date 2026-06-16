@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { createDiscoverer } from '#discover.ts';
 import { emitFile } from '#emit.ts';
 import { createIntrospector } from '#introspect.ts';
-import { parseOverrides, resolveFields } from '#nullability.ts';
+import { parseColumnComments, parseOverrides, resolveFields } from '#nullability.ts';
 import type { DiscoveredQuery, EmitModel, SqlgenConfig } from '#types.ts';
 
 // Suffix of the files we emit — used both to name outputs and to skip them on
@@ -73,6 +73,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     transformMigration: config.transformMigration,
   });
   const catalog = await intro.catalog();
+  const columnOverrides = parseColumnComments(await intro.columnComments());
   const types = await intro.types();
   const writable = await intro.writableColumns();
 
@@ -114,7 +115,13 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
           continue; // type what we can; report the rest in the summary
         }
         const overrides = parseOverrides(q.sql);
-        const resultFields = resolveFields({ described, catalog, overrides, types });
+        const resultFields = resolveFields({
+          described,
+          catalog,
+          overrides,
+          columnOverrides,
+          types,
+        });
         emitModels.push({ name: q.name, resultFields, neutralized: q.neutralized });
         typed++;
       }

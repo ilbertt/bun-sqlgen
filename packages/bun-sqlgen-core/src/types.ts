@@ -40,6 +40,8 @@ export interface DescribeResult {
   params: number[];
   fields: ResultField[];
   provenance: Provenance[] | null;
+  /** Base tables in scope (from the plan), for matching comment overrides by name. */
+  relations: string[];
 }
 
 /** Per-query escape hatches parsed from leading comments (`@notNull`/`@nullable`/`@type`). */
@@ -49,7 +51,26 @@ export interface Overrides {
   types: Map<string, string>;
 }
 
-export type NullabilityReason = 'override' | 'outer-join' | 'catalog' | 'unresolved' | 'expr';
+/** table -> column -> raw Postgres `COMMENT ON COLUMN` text. */
+export type RawColumnComments = Record<string, Record<string, string>>;
+
+/** Schema-level overrides parsed from a column's comment markers. */
+export interface ColumnOverride {
+  notNull?: boolean;
+  nullable?: boolean;
+  tsType?: string;
+}
+
+/** table -> column -> its parsed comment overrides. */
+export type ColumnOverrides = Record<string, Record<string, ColumnOverride>>;
+
+export type NullabilityReason =
+  | 'override'
+  | 'comment'
+  | 'outer-join'
+  | 'catalog'
+  | 'unresolved'
+  | 'expr';
 
 export interface ResolvedField {
   name: string;

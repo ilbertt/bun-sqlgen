@@ -6,6 +6,7 @@ import type {
   Catalog,
   DescribeResult,
   Provenance,
+  RawColumnComments,
   ResultField,
   TypeCatalog,
   TypeInfo,
@@ -16,6 +17,7 @@ import type {
 export interface Introspector {
   describe: (sql: string) => Promise<DescribeResult>;
   catalog: () => Promise<Catalog>;
+  columnComments: () => Promise<RawColumnComments>;
   types: () => Promise<TypeCatalog>;
   writableColumns: () => Promise<WritableColumns>;
   close: () => Promise<void>;
@@ -61,15 +63,20 @@ export async function createIntrospector(opts: IntrospectorOptions): Promise<Int
     // EXPLAIN with a non-null dummy per param: NULL would short-circuit `col = NULL`
     // and let the planner prune the scans we read provenance from.
     let provenance: Provenance[] | null = null;
+    let relations: string[] = [];
     try {
       const dummies = params.map(dummyForOid);
       const r = await db.query<ExplainRow>(`EXPLAIN (VERBOSE, FORMAT JSON) ${sql}`, dummies);
       const plan = r.rows[0]?.['QUERY PLAN'][0]?.Plan;
-      provenance = plan ? analyzePlan({ plan, fieldCount: fields.length }) : null;
+      if (plan) {
+        const analyzed = analyzePlan({ plan, fieldCount: fields.length });
+        provenance = analyzed.provenance;
+        relations = analyzed.relations;
+      }
     } catch {
       provenance = null; // everything falls back to nullable
     }
-    return { params, fields, provenance };
+    return { params, fields, provenance, relations };
   }
 
   // Per-column NOT NULL — the piece describeQuery can't give us.
@@ -83,6 +90,25 @@ export async function createIntrospector(opts: IntrospectorOptions): Promise<Int
     for (const row of r.rows) {
       map[row.table_name] ??= {};
       map[row.table_name]![row.column_name] = row.not_null;
+    }
+    return map;
+  }
+
+  // Per-column `COMMENT ON COLUMN` text — a place to declare schema-level
+  // `@notNull`/`@nullable`/`@type` overrides once, instead of per query.
+  async function columnComments(): Promise<RawColumnComments> {
+    const r = await db.query<CommentRow>(`
+      SELECT c.relname AS table_name, a.attname AS column_name, d.description
+      FROM pg_description d
+      JOIN pg_class c ON c.oid = d.objoid
+      JOIN pg_attribute a ON a.attrelid = d.objoid AND a.attnum = d.objsubid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE d.objsubid > 0 AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+    `);
+    const map: RawColumnComments = {};
+    for (const row of r.rows) {
+      map[row.table_name] ??= {};
+      map[row.table_name]![row.column_name] = row.description;
     }
     return map;
   }
@@ -141,7 +167,7 @@ export async function createIntrospector(opts: IntrospectorOptions): Promise<Int
     return map;
   }
 
-  return { describe, catalog, types, writableColumns, close: () => db.close() };
+  return { describe, catalog, columnComments, types, writableColumns, close: () => db.close() };
 }
 
 // ---- EXPLAIN plan typing ----------------------------------------------------
@@ -162,6 +188,12 @@ interface CatalogRow {
   table_name: string;
   column_name: string;
   not_null: boolean;
+}
+
+interface CommentRow {
+  table_name: string;
+  column_name: string;
+  description: string;
 }
 
 interface WritableRow {
@@ -197,6 +229,8 @@ function dummyForOid(oid: number): Dummy {
     case PG_OID.timestamp:
     case PG_OID.timestamptz:
       return '2000-01-01T00:00:00Z';
+    case PG_OID.uuid:
+      return '00000000-0000-0000-0000-000000000000';
     case PG_OID.json:
     case PG_OID.jsonb:
       return '{}';
@@ -224,7 +258,10 @@ const INNER_INPUT = 1;
 
 // Map alias->relation and the aliases on the nullable side of an outer join, then
 // align the top Output list (SELECT order) with the result fields.
-function analyzePlan(input: { plan: PlanNode; fieldCount: number }): Provenance[] {
+function analyzePlan(input: { plan: PlanNode; fieldCount: number }): {
+  provenance: Provenance[];
+  relations: string[];
+} {
   const { plan, fieldCount } = input;
   const aliasToRel: Record<string, string> = {};
   const nullableAliases = new Set<string>();
@@ -259,7 +296,7 @@ function analyzePlan(input: { plan: PlanNode; fieldCount: number }): Provenance[
   );
 
   const output = (plan.Output ?? []).slice(0, fieldCount);
-  return output.map((raw): Provenance => {
+  const provenance = output.map((raw): Provenance => {
     const expr = raw.trim();
     // Qualified column: `u.email`.
     const q = QUALIFIED_COLUMN.exec(expr);
@@ -286,6 +323,7 @@ function analyzePlan(input: { plan: PlanNode; fieldCount: number }): Provenance[
     // Functions, OVER(), literals, CASE, casts.
     return { kind: 'expr', expr };
   });
+  return { provenance, relations };
 }
 
 function firstLine(e: unknown): string {

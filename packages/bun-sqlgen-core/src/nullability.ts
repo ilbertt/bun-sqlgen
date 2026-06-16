@@ -1,9 +1,13 @@
 import { oidToTs } from '#oids.ts';
 import type {
   Catalog,
+  ColumnOverride,
+  ColumnOverrides,
   DescribeResult,
   NullabilityReason,
   Overrides,
+  Provenance,
+  RawColumnComments,
   ResolvedField,
   TypeCatalog,
 } from '#types.ts';
@@ -12,23 +16,31 @@ import type {
  * Resolve each result column's TS type and `| null`. A base-table column is
  * non-null iff it's NOT NULL *and* not on the nullable side of an outer join;
  * anything untraceable (expressions, aggregates, casts) is conservatively
- * nullable; `@notNull`/`@nullable` overrides win.
+ * nullable. Precedence: per-query `@notNull`/`@nullable`/`@type` win, then the
+ * column's own `COMMENT ON COLUMN` markers, then the catalog/OID defaults.
  */
 export function resolveFields(input: {
-  described: Pick<DescribeResult, 'fields' | 'provenance'>;
+  described: Pick<DescribeResult, 'fields' | 'provenance' | 'relations'>;
   catalog: Catalog;
   overrides: Overrides;
+  columnOverrides: ColumnOverrides;
   types: TypeCatalog;
 }): ResolvedField[] {
-  const { described, catalog, overrides, types } = input;
+  const { described, catalog, overrides, columnOverrides, types } = input;
   // biome-ignore lint/complexity/useMaxParams: native map callback reads cleaner with the index
   return described.fields.map((f, i): ResolvedField => {
-    // `@type` overrides the OID mapping (e.g. a precise shape for json); nullability still below.
-    const typeOverride = overrides.types.get(f.name);
-    const { ts, note } = typeOverride
-      ? { ts: typeOverride, note: undefined }
-      : oidToTs({ oid: f.oid, types });
     const prov = described.provenance?.[i];
+    const source = resolveSource({ prov, catalog });
+    // A column comment matched either via provenance, or — for fields the planner
+    // emits as expressions (e.g. VIRTUAL generated columns) — by name within a
+    // single in-scope relation.
+    const comment: ColumnOverride | undefined = source
+      ? columnOverrides[source.table]?.[source.column]
+      : commentByName({ name: f.name, relations: described.relations, columnOverrides });
+
+    // Type: per-query `@type` > column-comment `@type` > OID mapping.
+    const tsType = overrides.types.get(f.name) ?? comment?.tsType;
+    const { ts, note } = tsType ? { ts: tsType, note: undefined } : oidToTs({ oid: f.oid, types });
 
     let nullable: boolean;
     let reason: NullabilityReason;
@@ -38,23 +50,31 @@ export function resolveFields(input: {
     } else if (overrides.nullable.has(f.name)) {
       nullable = true;
       reason = 'override';
+    } else if (source && prov?.kind === 'column') {
+      // A column comment sets the base nullability (catalog otherwise); outer-join
+      // widening still applies on top.
+      const baseNotNull =
+        comment?.notNull === true
+          ? true
+          : comment?.nullable === true
+            ? false
+            : catalog[source.table]?.[source.column] === true;
+      nullable = !baseNotNull || prov.outerNullable;
+      reason =
+        comment?.notNull || comment?.nullable
+          ? 'comment'
+          : prov.outerNullable && baseNotNull
+            ? 'outer-join'
+            : 'catalog';
+    } else if (comment?.notNull) {
+      nullable = false;
+      reason = 'comment';
+    } else if (comment?.nullable) {
+      nullable = true;
+      reason = 'comment';
     } else if (prov?.kind === 'column') {
-      // Source table: from the alias, or the unique in-scope relation owning a bare column.
-      let table = prov.table;
-      if (!table && prov.candidates) {
-        const owners = prov.candidates.filter((t) => prov.column in (catalog[t] ?? {}));
-        if (owners.length === 1) {
-          table = owners[0]!;
-        }
-      }
-      if (table) {
-        const baseNotNull = catalog[table]?.[prov.column] === true;
-        nullable = !baseNotNull || prov.outerNullable;
-        reason = prov.outerNullable && baseNotNull ? 'outer-join' : 'catalog';
-      } else {
-        nullable = true;
-        reason = 'unresolved';
-      }
+      nullable = true;
+      reason = 'unresolved';
     } else {
       nullable = true;
       reason = 'expr';
@@ -62,6 +82,36 @@ export function resolveFields(input: {
 
     return { name: f.name, ts, nullable, reason, note };
   });
+}
+
+// A comment override for a field name owned by exactly one in-scope relation.
+function commentByName(input: {
+  name: string;
+  relations: string[];
+  columnOverrides: ColumnOverrides;
+}): ColumnOverride | undefined {
+  const owners = input.relations.filter((t) => input.columnOverrides[t]?.[input.name]);
+  return owners.length === 1 ? input.columnOverrides[owners[0]!]![input.name] : undefined;
+}
+
+// The base table + column a result field traces to (for catalog/comment lookups),
+// resolving a bare column to the unique in-scope relation that owns it.
+function resolveSource(input: {
+  prov: Provenance | undefined;
+  catalog: Catalog;
+}): { table: string; column: string } | null {
+  const { prov, catalog } = input;
+  if (prov?.kind !== 'column') {
+    return null;
+  }
+  let table = prov.table;
+  if (!table && prov.candidates) {
+    const owners = prov.candidates.filter((t) => prov.column in (catalog[t] ?? {}));
+    if (owners.length === 1) {
+      table = owners[0]!;
+    }
+  }
+  return table ? { table, column: prov.column } : null;
 }
 
 const NOT_NULL_PRAGMA = /@notNull\s+([\w\s]+)/g;
@@ -88,4 +138,33 @@ export function parseOverrides(commentText = ''): Overrides {
     types.set(m[1]!, m[2]!.trim()); // stop before a closing `*/`
   }
   return { notNull, nullable, types };
+}
+
+const COMMENT_TYPE_MARKER = /@type\s+([^\n]+)/;
+
+// Parse the schema-level markers out of a single column's `COMMENT ON COLUMN`
+// text. The column is implicit, so the markers are bare: `@notNull`, `@nullable`,
+// `@type <TsType>` — mixed freely with human-readable prose.
+export function parseColumnComment(text: string): ColumnOverride {
+  const typeMatch = COMMENT_TYPE_MARKER.exec(text);
+  return {
+    notNull: /@notNull\b/.test(text),
+    nullable: /@nullable\b/.test(text),
+    tsType: typeMatch?.[1]?.trim(),
+  };
+}
+
+// Parse every column comment into its overrides, dropping comments with no markers.
+export function parseColumnComments(raw: RawColumnComments): ColumnOverrides {
+  const out: ColumnOverrides = {};
+  for (const [table, columns] of Object.entries(raw)) {
+    for (const [column, text] of Object.entries(columns)) {
+      const override = parseColumnComment(text);
+      if (override.notNull || override.nullable || override.tsType) {
+        out[table] ??= {};
+        out[table]![column] = override;
+      }
+    }
+  }
+  return out;
 }
