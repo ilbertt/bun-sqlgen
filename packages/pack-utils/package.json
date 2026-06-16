@@ -1,0 +1,18 @@
+{
+  "name": "@repo/pack-utils",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "check:types": "bun run --bun tsc"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

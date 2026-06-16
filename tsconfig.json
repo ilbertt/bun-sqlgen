@@ -1,0 +1,5 @@
+{
+  "extends": "./packages/typescript-config/base.json",
+  "include": ["./commitlint.config.ts", "./scripts"],
+  "exclude": ["node_modules"]
+}

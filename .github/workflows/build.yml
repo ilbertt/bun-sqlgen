@@ -1,0 +1,20 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    name: build:required
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/prepare
+
+      - name: Build
+        run: bun run build

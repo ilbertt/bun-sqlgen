@@ -1,0 +1,19 @@
+name: check-pr-title
+
+on:
+  pull_request:
+
+jobs:
+  check-pr-title:
+    name: check-pr-title:required
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/prepare
+
+      - name: Check PR Title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "$PR_TITLE" | bun check:commit-message

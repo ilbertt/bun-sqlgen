@@ -1,0 +1,20 @@
+{
+  "name": "@repo/bun-sqlgen",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.ts",
+    "check:types": "bun run --bun tsc"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#*": "./src/*"
+  },
+  "devDependencies": {
+    "@repo/pack-utils": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

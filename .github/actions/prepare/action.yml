@@ -1,0 +1,21 @@
+name: Prepare
+description: Prepare the environment for the workflow
+
+runs:
+  using: composite
+  steps:
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version-file: .bun-version
+
+    - name: Turbo Cache
+      uses: actions/cache@v5
+      with:
+        path: .turbo
+        key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.job }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.job }}-
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile

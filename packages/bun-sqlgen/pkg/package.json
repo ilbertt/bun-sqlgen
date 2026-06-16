@@ -1,0 +1,31 @@
+{
+  "name": "@ilbertt/bun-sqlgen",
+  "description": "SQL generation utilities for Bun's built-in SQL module",
+  "version": "0.0.1",
+  "author": "ilbertt",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ilbertt/bun-sqlgen",
+    "directory": "packages/bun-sqlgen"
+  },
+  "license": "Unlicense",
+  "type": "module",
+  "engines": {
+    "bun": "^1.3.0",
+    "node": "please-use-bun"
+  },
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "bun": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/*",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {}
+}

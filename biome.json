@@ -1,0 +1,92 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": false,
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/bun.lock",
+      "!**/*.lock"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "useEditorconfig": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "complexity": {
+        "useMaxParams": {
+          "level": "error",
+          "options": {
+            "max": 1
+          }
+        }
+      },
+      "performance": {
+        "noBarrelFile": "error"
+      },
+      "suspicious": {
+        "useAwait": "error"
+      },
+      "nursery": {
+        "useAwaitThenable": "error",
+        "noFloatingPromises": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "off",
+        "useBlockStatements": "error",
+        "noMagicNumbers": "error",
+        "noExportedImports": "error",
+        "useFilenamingConvention": {
+          "level": "off",
+          "options": {
+            "filenameCases": ["kebab-case"]
+          }
+        }
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "lineWidth": 100
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    },
+    "formatter": {
+      "enabled": false
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": "error"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "name": "bun-sqlgen",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "bun run --bun turbo build",
+    "check:types": "bun run --bun turbo check:types",
+    "check:codestyle": "bun run --bun biome check",
+    "check:all": "bun check:types && bun check:codestyle",
+    "check:commit-message": "bun run --bun commitlint",
+    "fix:codestyle": "bun run --bun biome check --write"
+  },
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "examples/*"
+    ],
+    "catalog": {
+      "typescript": "^5.9.3"
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
+    "@commitlint/format": "^21.0.1",
+    "@commitlint/types": "^21.0.1",
+    "@types/bun": "^1.3.14",
+    "git-cliff": "^2.13.1",
+    "typescript": "catalog:",
+    "turbo": "^2.9.18"
+  },
+  "packageManager": "bun@1.3.14"
+}

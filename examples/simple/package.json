@@ -1,0 +1,20 @@
+{
+  "name": "@repo/example-simple",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "check:types": "bun run --bun tsc",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@repo/bun-sqlgen": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  },
+  "imports": {
+    "#*": "./src/*"
+  }
+}

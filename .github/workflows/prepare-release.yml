@@ -1,0 +1,66 @@
+name: prepare-release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare
+
+      - name: Compute next version
+        id: version
+        run: echo "version=$(bun scripts/bumped-version.ts)" >> "$GITHUB_OUTPUT"
+
+      - name: Update package.json version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bun scripts/set-version.ts "$VERSION"
+
+      - name: Generate changelog
+        run: bun scripts/generate-changelog.ts
+
+      - name: Configure git user
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Commit and push to release branch
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_BRANCH: release/v${{ steps.version.outputs.version }}
+        run: |
+          git switch -c "$RELEASE_BRANCH"
+          git add packages/bun-sqlgen/pkg/package.json CHANGELOG.md
+          git commit -m "chore(release): v${VERSION}"
+          git push --set-upstream origin "$RELEASE_BRANCH"
+
+      - name: Create release PR
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr create \
+            --title "chore(release): v${VERSION}" \
+            --body "$(cat <<EOF
+          Bumps version to **${VERSION}** and regenerates CHANGELOG.md.
+
+          After merging, tag and push to trigger the publish workflow:
+
+          \`\`\`
+          git tag v${VERSION}
+          git push origin v${VERSION}
+          \`\`\`
+          EOF
+          )"

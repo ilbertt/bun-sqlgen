@@ -1,0 +1,44 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  id-token: write # OIDC token for npm Trusted Publishing
+  contents: write # create the GitHub Release
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: Publish
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare
+
+      - name: Build
+        run: bun run build
+
+      - name: Setup Node for npm publish
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish to npm
+        working-directory: packages/bun-sqlgen/pkg
+        run: npm publish --access public --provenance
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          body=$(bun scripts/release-notes.ts)
+          gh release create "$TAG_NAME" --title "$TAG_NAME" --notes "$body"
