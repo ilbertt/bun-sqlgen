@@ -31,8 +31,6 @@
   ],
   "dependencies": {
     "@electric-sql/pglite": "^0.5.2",
-    "@parshjs/core": "^0.0.10",
-    "typescript": "^5.9.3",
-    "zod": "^4.4.3"
+    "typescript": "^5.9.3"
   }
 }

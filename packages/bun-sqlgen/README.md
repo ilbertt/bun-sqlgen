@@ -23,10 +23,13 @@ its formatting). Adding/renaming a command means re-running codegen:
 bun run codegen   # parsh-codegen → src/cli/command-tree.gen.ts (commit the result)
 ```
 
-`build.ts` externalizes declared runtime deps (PGlite, TypeScript, parsh, zod) so
-they aren't inlined — but **skips `workspace:` deps**, so `@repo/bun-sqlgen-core`
-is bundled into the binary rather than published as a dependency. The `lib.ts`
-types are emitted with `tsc` (clean `.d.ts`, no `#subpath` leakage).
+`build.ts` externalizes the `dependencies` that can't (or shouldn't) be inlined —
+**PGlite** (its WASM data file is resolved from disk at runtime, so it can't be
+bundled) and **TypeScript** (huge, and every consumer already has it, so npm
+dedupes). Everything else, including `workspace:` deps and CLI-only libs kept in
+`devDependencies` (parsh, zod), is **bundled** into the binary — so the published
+package declares only PGlite + TypeScript. The `lib.ts` types are emitted with
+`tsc` (clean `.d.ts`, no `#subpath` leakage).
 
 ## Dev scripts
 
