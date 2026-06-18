@@ -6,7 +6,10 @@
     "bun-sqlgen": "./src/cli/main.ts"
   },
   "exports": {
-    ".": "./src/lib.ts"
+    ".": {
+      "bun": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
   },
   "scripts": {
     "build": "bun run build.ts",
@@ -18,14 +21,14 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "catalog:",
+    "@parshjs/core": "^0.0.10",
     "@repo/bun-sqlgen-core": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@parshjs/codegen": "^0.0.5",
-    "@parshjs/core": "^0.0.10",
     "@repo/pack-utils": "workspace:*",
-    "@repo/typescript-config": "workspace:*",
-    "zod": "catalog:"
+    "@repo/typescript-config": "workspace:*"
   }
 }

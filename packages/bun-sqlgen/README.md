@@ -5,15 +5,17 @@
 This package ships **two entries** under one published name
 [`@ilbertt/bun-sqlgen`](./pkg/README.md):
 
-- **`src/lib.ts`** — the `.` export: `withTypes` and the `QueryResults` registry
-  that generated `*.gen.d.ts` files augment. Self-contained (only `bun` types), so
-  it's a featherweight runtime import.
+- **`src/index.ts`** + **`src/lib/`** — the `.` export: `withTypes` and the
+  `QueryResults` registry that generated `*.gen.d.ts` files augment. It's a
+  **Bun-only** package, so the lib is shipped as TypeScript **source** (`build.ts`
+  copies it verbatim to `dist/`); Bun runs the `.ts` directly and reads its types
+  from the same files — no compile step, no `.d.ts`. The `.` export uses the `bun`
+  condition (with a `default` fallback so editors/`tsc` resolve types without
+  needing `customConditions`).
 - **`src/cli/`** — the `bun-sqlgen` bin (not exported), a thin
   [parsh](https://github.com/ilbertt/parsh) front-end over
   [`@repo/bun-sqlgen-core`](../bun-sqlgen-core) (the actual generator library),
-  which it **bundles** into the binary.
-
-Both build into [`pkg/`](./pkg/) (`dist/lib.{js,d.ts}` + `dist/cli/main.js`).
+  which it **bundles** into the single `dist/cli/main.js`.
 
 CLI commands are file-routed (filename → command path), so `_root.ts`/`[glob].ts`
 are parsh conventions, and `*.gen.ts` is excluded from Biome (the generator owns
@@ -23,18 +25,17 @@ its formatting). Adding/renaming a command means re-running codegen:
 bun run codegen   # parsh-codegen → src/cli/command-tree.gen.ts (commit the result)
 ```
 
-`build.ts` externalizes the `dependencies` that can't (or shouldn't) be inlined —
-**PGlite** (its WASM data file is resolved from disk at runtime, so it can't be
-bundled) and **TypeScript** (huge, and every consumer already has it, so npm
-dedupes). Everything else, including `workspace:` deps and CLI-only libs kept in
-`devDependencies` (parsh, zod), is **bundled** into the binary — so the published
-package declares only PGlite + TypeScript. The `lib.ts` types are emitted with
-`tsc` (clean `.d.ts`, no `#subpath` leakage).
+Only the CLI is bundled. `build.ts` externalizes the two deps that can't (or
+shouldn't) be inlined: **PGlite** (its WASM data file is resolved from disk at
+runtime, so it can't be bundled — a `dependency`) and **TypeScript** (large, and
+any consumer already has it — a `peerDependency`). Everything else (parsh, zod,
+and the `workspace:` core) is bundled into the binary, so the published package
+declares just those two. The lib ships as source, so nothing compiles it.
 
 ## Dev scripts
 
 ```sh
-bun run build         # bundle src/main.ts into pkg/dist (deps externalized)
+bun run build         # bundle the CLI + copy the lib source into pkg/dist
 bun run check:types   # type-check with tsc
 bun run codegen       # regenerate the parsh command tree
 ```

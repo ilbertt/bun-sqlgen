@@ -17,20 +17,23 @@
   "bin": {
     "bun-sqlgen": "./dist/cli/main.js"
   },
+  "types": "./dist/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/lib.d.ts",
-      "default": "./dist/lib.js"
+      "bun": "./dist/index.ts",
+      "default": "./dist/index.ts"
     }
   },
   "files": [
-    "dist/*",
+    "dist",
     "package.json",
     "README.md",
     "LICENSE"
   ],
   "dependencies": {
-    "@electric-sql/pglite": "^0.5.2",
+    "@electric-sql/pglite": "^0.5.2"
+  },
+  "peerDependencies": {
     "typescript": "^5.9.3"
   }
 }
