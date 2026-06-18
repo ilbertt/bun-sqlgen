@@ -7,11 +7,10 @@ This package ships **two entries** under one published name
 
 - **`src/index.ts`** + **`src/lib/`** — the `.` export: `withTypes` and the
   `QueryResults` registry that generated `*.gen.d.ts` files augment. It's a
-  **Bun-only** package, so the lib is shipped as TypeScript **source** (`build.ts`
-  copies it verbatim to `dist/`); Bun runs the `.ts` directly and reads its types
-  from the same files — no compile step, no `.d.ts`. The `.` export uses the `bun`
-  condition (with a `default` fallback so editors/`tsc` resolve types without
-  needing `customConditions`).
+  **Bun-only** package, so the `.` export's `bun` condition points at the TypeScript
+  **source** (`build.ts` copies it to `pkg/src/`, which Bun runs directly), while the
+  `types` condition points at generated `.d.ts` in `pkg/dist/` (`tsc
+  --emitDeclarationOnly`) so editors/`tsc` and the npm types badge resolve cleanly.
 - **`src/cli/`** — the `bun-sqlgen` bin (not exported), a thin
   [parsh](https://github.com/ilbertt/parsh) front-end over
   [`@repo/bun-sqlgen-core`](../bun-sqlgen-core) (the actual generator library),
@@ -30,7 +29,8 @@ shouldn't) be inlined: **PGlite** (its WASM data file is resolved from disk at
 runtime, so it can't be bundled — a `dependency`) and **TypeScript** (large, and
 any consumer already has it — a `peerDependency`). Everything else (parsh, zod,
 and the `workspace:` core) is bundled into the binary, so the published package
-declares just those two. The lib ships as source, so nothing compiles it.
+declares just those two. The lib isn't bundled — its source is copied and its
+`.d.ts` emitted alongside.
 
 ## Dev scripts
 

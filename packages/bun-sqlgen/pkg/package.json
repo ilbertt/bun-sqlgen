@@ -17,14 +17,15 @@
   "bin": {
     "bun-sqlgen": "./dist/cli/main.js"
   },
-  "types": "./dist/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "bun": "./dist/index.ts",
-      "default": "./dist/index.ts"
+      "types": "./dist/index.d.ts",
+      "bun": "./src/index.ts"
     }
   },
   "files": [
+    "src",
     "dist",
     "package.json",
     "README.md",

@@ -1,4 +1,4 @@
-import { copyFile, cp } from 'node:fs/promises';
+import { copyFile, cp, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   assertBuildSuccess,
@@ -12,6 +12,7 @@ const ROOT_LICENSE_PATH = join(CURRENT_DIR, '../..', 'LICENSE');
 
 const PKG_DIR = join(CURRENT_DIR, 'pkg');
 const DIST_DIR = join(PKG_DIR, 'dist');
+const PKG_SRC_DIR = join(PKG_DIR, 'src');
 const LICENSE_DESTINATION_PATH = join(PKG_DIR, 'LICENSE');
 
 // Only the CLI is bundled (into a single `dist/cli/main.js` bin). The library is
@@ -37,8 +38,9 @@ const RUNTIME_DEPENDENCIES = EXTERNAL_DEPENDENCIES.filter((d) => !PEER_DEPENDENC
 console.log('⚙️  Generating command tree...');
 await Bun.$`bun run codegen`;
 
-console.log('🧹 Cleaning dist directory...');
+console.log('🧹 Cleaning output directories...');
 await cleanDir({ dir: DIST_DIR });
+await cleanDir({ dir: PKG_SRC_DIR });
 
 console.log('🔨 Building CLI...');
 const buildResult = await Bun.build({
@@ -51,11 +53,18 @@ const buildResult = await Bun.build({
 assertBuildSuccess({ buildResult });
 printBuildOutput({ buildResult });
 
-// Copy the library source verbatim — it's the `.` export. Lives under `dist/` so a
-// single `files: ["dist"]` ships everything and `clean` wipes it each build.
+// Ship the library as source under `pkg/src` — Bun runs it via the `bun` export
+// condition. (`.ts` belongs in `src/`, not `dist/`.)
 console.log('📚 Copying library source...');
-await copyFile(join(CURRENT_DIR, 'src', LIB_ENTRY), join(DIST_DIR, LIB_ENTRY));
-await cp(join(CURRENT_DIR, 'src', LIB_DIR), join(DIST_DIR, LIB_DIR), { recursive: true });
+await mkdir(PKG_SRC_DIR, { recursive: true });
+await copyFile(join(CURRENT_DIR, 'src', LIB_ENTRY), join(PKG_SRC_DIR, LIB_ENTRY));
+await cp(join(CURRENT_DIR, 'src', LIB_DIR), join(PKG_SRC_DIR, LIB_DIR), { recursive: true });
+
+// Emit declarations to `pkg/dist` (the `types` export condition), so editors/tsc and
+// the npm "types" badge resolve without parsing the `.ts` source. Relative imports +
+// `bun` types only → clean `.d.ts`, no `#subpath` leakage.
+console.log('📐 Emitting library types...');
+await Bun.$`bun x tsc src/index.ts --declaration --emitDeclarationOnly --outDir ${DIST_DIR} --target esnext --module esnext --moduleResolution bundler --allowImportingTsExtensions --skipLibCheck --types bun`;
 
 console.log('📄 Copying license...');
 await copyFile(ROOT_LICENSE_PATH, LICENSE_DESTINATION_PATH);
