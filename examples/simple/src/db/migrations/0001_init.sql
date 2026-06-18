@@ -1,4 +1,3 @@
--- The schema is the source of truth for nullability (NOT NULL lives here).
 CREATE TABLE users (
   id           bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   email        text NOT NULL,
