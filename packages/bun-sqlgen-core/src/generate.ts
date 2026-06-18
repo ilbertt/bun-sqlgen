@@ -2,13 +2,17 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createDiscoverer } from '#discover.ts';
-import { emitModule } from '#emit.ts';
+import { emitModule } from '#emit/index.ts';
 import { createIntrospector } from '#introspect.ts';
 import { parseColumnComments, parseOverrides, resolveFields } from '#nullability.ts';
 import type { DiscoveredQuery, EmitModel, SqlgenConfig } from '#types.ts';
 
 // Where the aggregated module lands when `--out` is omitted.
-const DEFAULT_OUT = 'src/queries.gen.ts';
+const DEFAULT_OUT = 'src/queries.gen.d.ts';
+
+// The package whose `QueryResults` registry the generated `declare module` augments.
+// Real users import `withTypes` from here; override with `--package` (e.g. a workspace alias).
+const DEFAULT_PACKAGE = '@ilbertt/bun-sqlgen';
 
 // Our own output, never fed back in as a query source: the aggregated module
 // (`*.gen.ts`) and any legacy per-file siblings (`*.gen.d.ts`).
@@ -23,8 +27,10 @@ export interface GenerateOptions {
   check?: boolean;
   /** Explicit path to `sqlgen.config.{ts,js,mjs}`; auto-discovered otherwise. */
   configPath?: string;
-  /** Output path for the aggregated module, relative to `cwd`. Defaults to `src/queries.gen.ts`. */
+  /** Output path for the aggregated module, relative to `cwd`. Defaults to `src/queries.gen.d.ts`. */
   out?: string;
+  /** Package whose `QueryResults` registry to augment. Defaults to `@ilbertt/bun-sqlgen`. */
+  packageName?: string;
   /** Base directory for globs, migrations, and tsconfig lookup. Defaults to cwd. */
   cwd?: string;
 }
@@ -145,7 +151,10 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   const typed = emitModels.length;
   let changed = false;
   if (typed > 0) {
-    const contents = emitModule({ queries: emitModels });
+    const contents = emitModule({
+      queries: emitModels,
+      packageName: options.packageName ?? DEFAULT_PACKAGE,
+    });
     if (safeRead(outPath) !== contents) {
       changed = true;
       if (check) {

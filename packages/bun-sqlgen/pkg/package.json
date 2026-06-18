@@ -15,7 +15,13 @@
     "node": "please-use-bun"
   },
   "bin": {
-    "bun-sqlgen": "./dist/main.js"
+    "bun-sqlgen": "./dist/cli/main.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/lib.d.ts",
+      "default": "./dist/lib.js"
+    }
   },
   "files": [
     "dist/*",

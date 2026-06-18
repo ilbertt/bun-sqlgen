@@ -1,7 +1,7 @@
 import { defineCommand } from '@parshjs/core';
 import { generate } from '@repo/bun-sqlgen-core';
 import { z } from 'zod';
-import { GenerationFailed } from '#errors.ts';
+import { GenerationFailed } from '#cli/errors.ts';
 
 export const command = defineCommand('generate [glob]', {
   description:
@@ -16,7 +16,11 @@ export const command = defineCommand('generate [glob]', {
     },
     out: {
       schema: z.string().optional(),
-      description: 'Output path for the generated module (default src/queries.gen.ts).',
+      description: 'Output path for the generated module (default src/queries.gen.d.ts).',
+    },
+    package: {
+      schema: z.string().optional(),
+      description: 'Package whose QueryResults registry to augment (default @ilbertt/bun-sqlgen).',
     },
     config: {
       schema: z.string().optional(),
@@ -32,6 +36,7 @@ export const command = defineCommand('generate [glob]', {
       queries: params.glob,
       migrations: options.migrations,
       out: options.out,
+      packageName: options.package,
       configPath: options.config,
       check: options.check,
     });

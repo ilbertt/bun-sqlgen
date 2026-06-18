@@ -3,12 +3,15 @@
   "private": true,
   "type": "module",
   "bin": {
-    "bun-sqlgen": "./src/main.ts"
+    "bun-sqlgen": "./src/cli/main.ts"
+  },
+  "exports": {
+    ".": "./src/lib.ts"
   },
   "scripts": {
     "build": "bun run build.ts",
     "check:types": "bun run --bun tsc",
-    "codegen": "parsh-codegen generate --commands src/commands --out src/command-tree.gen.ts --eager"
+    "codegen": "parsh-codegen generate --commands src/cli/commands --out src/cli/command-tree.gen.ts --eager"
   },
   "imports": {
     "#*": "./src/*"

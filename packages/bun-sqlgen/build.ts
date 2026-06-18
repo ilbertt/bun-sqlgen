@@ -15,7 +15,10 @@ const PKG_DIR = join(CURRENT_DIR, 'pkg');
 const DIST_DIR = join(PKG_DIR, 'dist');
 const LICENSE_DESTINATION_PATH = join(PKG_DIR, 'LICENSE');
 
-const PACKAGE_ENTRYPOINTS = ['./src/main.ts'];
+// `cli/main.ts` is the bin (bundles core + externalized deps); `lib.ts` is the
+// published library entry (`withTypes` + the `QueryResults` registry that generated
+// files augment). Common root `src/` → `dist/cli/main.js` and `dist/lib.js`.
+const PACKAGE_ENTRYPOINTS = ['./src/cli/main.ts', './src/lib.ts'];
 
 // Externalize published deps (keeps PGlite's WASM out of dist); bundle `workspace:`
 // deps since `@repo/bun-sqlgen-core` is never published on its own.
@@ -40,6 +43,11 @@ const buildResult = await Bun.build({
 });
 assertBuildSuccess({ buildResult });
 printBuildOutput({ buildResult });
+
+// `lib.ts` is self-contained (only `import type { SQL } from 'bun'`), so tsc emits a
+// clean `dist/lib.d.ts` with no `#subpath` imports to leak into the published types.
+console.log('📐 Emitting library types...');
+await Bun.$`bun x tsc src/lib.ts --declaration --emitDeclarationOnly --outDir ${DIST_DIR} --target esnext --module esnext --moduleResolution bundler --skipLibCheck --types bun`;
 
 console.log('📄 Copying license...');
 await copyFile(ROOT_LICENSE_PATH, LICENSE_DESTINATION_PATH);

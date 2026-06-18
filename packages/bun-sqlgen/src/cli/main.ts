@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { createCli } from '@parshjs/core';
-import { commandTree } from '#command-tree.gen.ts';
-import { GenerationFailed } from '#errors.ts';
+import { commandTree } from '#cli/command-tree.gen.ts';
+import { GenerationFailed } from '#cli/errors.ts';
 
 const EXIT_FAILURE = 1;
 

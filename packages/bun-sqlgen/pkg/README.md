@@ -10,15 +10,17 @@ Name a query by the **property** you tag it with — `sql.GetUser\`...\`` — an
 row type is inferred at the call site, no manual generic:
 
 ```
-sql.GetUser`...`  ──▶  describe against PGlite  ──▶  emit queries.gen.ts
-  (your code)          (catches bad SQL here)        (registry + withTypes wrapper)
+sql.GetUser`...`  ──▶  describe against PGlite  ──▶  emit queries.gen.d.ts
+  (your code)          (catches bad SQL here)        (augments the registry)
        └──────────────── tsc infers the row type from `.GetUser` ───────────────┘
 ```
 
-`tsc` never parses SQL. The generator hits the database; `tsc` just consumes the
-types it writes. Runtime stays 100% Bun-native — fragments, prepared-statement
-caching, and injection-safe binding are all preserved; the generator only reads
-your code and writes one aggregated type module.
+`withTypes` ships in this package; the generated file is pure types that augment
+its `QueryResults` registry (the [parsh](https://github.com/ilbertt/parsh) /
+TanStack-style `declare module` pattern). `tsc` never parses SQL — the generator
+hits the database, `tsc` just consumes the types it writes. Runtime stays 100%
+Bun-native: fragments, prepared-statement caching, and injection-safe binding are
+all preserved.
 
 > Why a property and not the query text? TypeScript widens tagged-template strings
 > to `string`, so it can't read a `@name` comment out of the template at the type
@@ -28,11 +30,13 @@ your code and writes one aggregated type module.
 ## Installation
 
 ```sh
-bun add -d @ilbertt/bun-sqlgen
+bun add @ilbertt/bun-sqlgen
 ```
 
-Requires Bun ≥ 1.3. PGlite (in-process WASM Postgres — no Docker) is pulled in as
-a dependency and used only at generation time.
+Install it as a regular dependency: `withTypes` is imported at runtime, and the
+`bun-sqlgen` codegen bin lives in the same package. Requires Bun ≥ 1.3. PGlite
+(in-process WASM Postgres — no Docker) is pulled in too but is only loaded by the
+CLI at generation time — `withTypes` itself has no heavy dependencies.
 
 ## Quick start
 
@@ -48,13 +52,13 @@ a dependency and used only at generation time.
    );
    ```
 
-2. **Wrap your client** with `withTypes` (imported from the not-yet-generated
-   module), then tag each query with its name and read it back at the call site:
+2. **Wrap your client** with `withTypes`, then tag each query with its name and
+   read it back at the call site:
 
    ```ts
    // src/queries.ts
+   import { withTypes } from '@ilbertt/bun-sqlgen';
    import { SQL } from 'bun';
-   import { withTypes } from './queries.gen';
 
    const sql = withTypes(new SQL(Bun.env.DATABASE_URL!));
 
@@ -72,8 +76,9 @@ a dependency and used only at generation time.
    bunx bun-sqlgen generate 'src/**/*.ts' --migrations migrations
    ```
 
-   This writes one aggregated `src/queries.gen.ts` — the result interfaces, a
-   name→row registry, and the `withTypes` wrapper:
+   This writes `src/queries.gen.d.ts` — the result interfaces plus a `declare
+   module` block that augments the registry. No runtime; nothing to import (the
+   `.d.ts` is ambient, so the augmentation applies on its own):
 
    ```ts
    export interface IGetUserResult {
@@ -81,11 +86,9 @@ a dependency and used only at generation time.
      email: string;
      display_name: string | null;
    }
-   export interface QueryResults {
-     GetUser: IGetUserResult;
+   declare module '@ilbertt/bun-sqlgen' {
+     interface QueryResults { GetUser: IGetUserResult }
    }
-   export type TypedSQL = SQL & { readonly [K in keyof QueryResults]: ... };
-   export function withTypes(sql: SQL): TypedSQL { /* Proxy */ }
    ```
 
 Now `user.emial` is a compile error and `user.display_name.length` is flagged as
@@ -93,23 +96,21 @@ possibly-null — all by plain `tsc`.
 
 The untyped `sql\`...\`` escape hatch and real methods (`sql.begin`, …) keep
 working on the wrapped client. The interfaces are also exported, so the explicit
-`sql<IGetUserResult[]>\`/* @name GetUser */ ...\`` form still works if you prefer it.
-
-> First run: the generated module doesn't exist yet, so the import is unresolved
-> until the first `generate` writes it — exactly like importing a not-yet-generated
-> type. Commit `queries.gen.ts` and it's resolved from then on.
+`sql<IGetUserResult[]>\`/* @name GetUser */ ...\`` form works too (import the
+interface from `./queries.gen`).
 
 ## CLI
 
 ```sh
-bunx bun-sqlgen generate <glob> --migrations <dir> [--out <file>] [--config <file>] [--check]
+bunx bun-sqlgen generate <glob> --migrations <dir> [--out <file>] [--package <name>] [--config <file>] [--check]
 ```
 
 | argument | meaning |
 |---|---|
 | `<glob>` | glob for your query source files, e.g. `'src/**/*.ts'` (quote it so the shell doesn't expand it). |
 | `--migrations <dir>` | **required** — your migrations directory. |
-| `--out <file>` | output path for the generated module (default `src/queries.gen.ts`). Point your `withTypes` import at it. |
+| `--out <file>` | output path for the generated module (default `src/queries.gen.d.ts`). |
+| `--package <name>` | package whose `QueryResults` registry to augment (default `@ilbertt/bun-sqlgen`) — the specifier you import `withTypes` from. |
 | `--config <file>` | explicit path to `sqlgen.config.{ts,js,mjs}`. |
 | `--check` | fail (exit 1) if anything would change — the `sqlx prepare --check` analog for CI. |
 
@@ -125,7 +126,7 @@ Paths resolve relative to the current directory. A suggested wiring in
 }
 ```
 
-Commit the generated `queries.gen.ts` and run `codegen:check` in CI so an edited
+Commit the generated `queries.gen.d.ts` and run `codegen:check` in CI so an edited
 query can never type-check against a stale shape.
 
 ## Configuration
@@ -151,7 +152,7 @@ export default {
 
 A query's name is the **property you tag it with** — `sql.GetUser\`...\`` becomes
 `IGetUserResult` and the `GetUser` registry key. Names must be unique across the
-whole project (they share one module). Using the explicit-generic escape hatch
+whole project (they share one registry). Using the explicit-generic escape hatch
 instead? Name it with a `/* @name Foo */` comment (before the tag or inside the
 SQL); an unnamed one falls back to `IUnnamedQueryNResult` as a nudge to name it.
 

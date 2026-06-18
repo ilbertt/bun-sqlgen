@@ -10,7 +10,7 @@
         "@commitlint/config-conventional": "^21.0.2",
         "@commitlint/format": "^21.0.1",
         "@commitlint/types": "^21.0.1",
-        "@types/bun": "^1.3.14",
+        "@types/bun": "catalog:",
         "git-cliff": "^2.13.1",
         "turbo": "^2.9.18",
         "typescript": "catalog:",
@@ -21,14 +21,14 @@
       "devDependencies": {
         "@repo/bun-sqlgen": "workspace:*",
         "@repo/typescript-config": "workspace:*",
-        "@types/bun": "^1.3.14",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
       },
     },
     "packages/bun-sqlgen": {
       "name": "@repo/bun-sqlgen",
       "bin": {
-        "bun-sqlgen": "./src/main.ts",
+        "bun-sqlgen": "./src/cli/main.ts",
       },
       "dependencies": {
         "@electric-sql/pglite": "catalog:",
@@ -51,7 +51,7 @@
       },
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
-        "@types/bun": "^1.3.14",
+        "@types/bun": "catalog:",
       },
     },
     "packages/pack-utils": {
@@ -67,6 +67,7 @@
   },
   "catalog": {
     "@electric-sql/pglite": "^0.5.2",
+    "@types/bun": "^1.3.14",
     "typescript": "^5.9.3",
     "zod": "^4.4.3",
   },

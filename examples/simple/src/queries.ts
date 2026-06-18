@@ -1,5 +1,6 @@
+import { withTypes } from '@repo/bun-sqlgen';
 import { SQL } from 'bun';
-import { type ICountDealsResult, withTypes } from './queries.gen';
+import type { ICountDealsResult } from './queries.gen';
 
 const sql = withTypes(new SQL(Bun.env.DATABASE_URL ?? 'postgres://localhost/example'));
 

@@ -13,7 +13,8 @@
       "!**/dist",
       "!**/bun.lock",
       "!**/*.lock",
-      "!**/*.gen.ts"
+      "!**/*.gen.ts",
+      "!**/*.gen.d.ts"
     ]
   },
   "formatter": {
