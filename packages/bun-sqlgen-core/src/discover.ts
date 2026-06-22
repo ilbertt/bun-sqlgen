@@ -126,7 +126,6 @@ function discover(input: {
       sql,
       paramCount: ctx.paramCount,
       neutralized: !!ctx.neutralized,
-      skip: hasPragma({ node, sf, tag: 'skip' }),
       line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
     });
   }
@@ -339,8 +338,8 @@ function neutralToken(input: { sqlSoFar: string; ctx: DiscoverCtx }): string {
       return col;
     }
   }
-  // SELECT-list: keep the column as NULL so the row shape is preserved (`@skip` the
-  // query to hand-type it if the real column matters).
+  // SELECT-list: keep the column as NULL so the row shape is preserved (drop the
+  // `sql.Name` tag and hand-type the query if the real column type matters).
   if (SELECT_LIST_BOUNDARY.test(tail)) {
     return 'NULL';
   }
@@ -404,24 +403,4 @@ function typeIsBunSql(type: ts.Type): boolean {
     return true;
   }
   return type.isIntersection() && type.types.some(typeIsBunSql);
-}
-
-// `/* @skip */` opts a query out of generation (type it by hand instead).
-function hasPragma(input: {
-  node: ts.TaggedTemplateExpression;
-  sf: ts.SourceFile;
-  tag: string;
-}): boolean {
-  return new RegExp(`@${input.tag}\\b`).test(annotationText(input));
-}
-
-// Comments just before the tag, plus a leading comment inside the SQL.
-function annotationText(input: { node: ts.TaggedTemplateExpression; sf: ts.SourceFile }): string {
-  const { node, sf } = input;
-  const before = (ts.getLeadingCommentRanges(sf.text, node.pos) ?? [])
-    .map((r) => sf.text.slice(r.pos, r.end))
-    .join('\n');
-  const tpl = node.template;
-  const head = ts.isNoSubstitutionTemplateLiteral(tpl) ? tpl.text : tpl.head.text;
-  return `${before}\n${head}`;
 }

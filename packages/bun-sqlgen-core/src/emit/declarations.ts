@@ -25,9 +25,12 @@ function fieldSignature(field: ResolvedField): ts.PropertySignature {
   return sig;
 }
 
+// The row interface backing one registry entry. Module-local (not exported): the
+// public way to name a row type is `QueryResults['Name']`, so there is a single
+// access path and no second importable surface to keep in sync.
 export function resultInterface(q: EmitModel): ts.InterfaceDeclaration {
   const node = f.createInterfaceDeclaration(
-    [f.createModifier(ts.SyntaxKind.ExportKeyword)],
+    undefined,
     resultName(q.name),
     undefined,
     undefined,
@@ -39,14 +42,6 @@ export function resultInterface(q: EmitModel): ts.InterfaceDeclaration {
     `* Result of query \`${q.name}\`. `,
     true,
   );
-  if (q.neutralized) {
-    for (const line of [
-      ' NOTE: dynamic clauses (composed fragments) were neutralized for typing;',
-      ' the row shape is unaffected, but verify no dynamic SELECT columns were dropped.',
-    ]) {
-      ts.addSyntheticLeadingComment(node, ts.SyntaxKind.SingleLineCommentTrivia, line, true);
-    }
-  }
   return node;
 }
 

@@ -88,14 +88,12 @@ export interface DiscoveredQuery {
   sql: string;
   paramCount: number;
   neutralized: boolean;
-  skip: boolean;
   line: number;
 }
 
 export interface EmitModel {
   name: string;
   resultFields: ResolvedField[];
-  neutralized: boolean;
 }
 
 /** `sqlgen.config.ts` — shapes the throwaway introspection DB to match production. */

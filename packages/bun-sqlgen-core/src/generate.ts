@@ -45,7 +45,6 @@ export interface GenerateFailure {
 
 export interface GenerateResult {
   typed: number;
-  skipped: number;
   failures: GenerateFailure[];
   changed: boolean;
 }
@@ -54,9 +53,10 @@ const SQL_PREVIEW_LONG = 90;
 const SQL_PREVIEW_SHORT = 70;
 
 /**
- * The `sqlx prepare` analog: discover `sql<Row[]>` tags -> describe against
- * PGlite -> resolve types/nullability -> write `<base>.gen.d.ts` siblings. Source
- * files are never touched; you import the generated `IFooResult` types yourself.
+ * The `sqlx prepare` analog: discover `sql.Name\`...\`` tags -> describe each
+ * against PGlite -> resolve types/nullability -> write one aggregated module that
+ * augments the package's `QueryResults` registry. Source files are never touched;
+ * `withTypes` reads each row type from the registry at the call site.
  */
 export async function generate(options: GenerateOptions): Promise<GenerateResult> {
   const cwd = options.cwd ? resolve(options.cwd) : process.cwd();
@@ -94,22 +94,18 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   const discover = createDiscoverer({ projectRoot: cwd, files: sourceFiles, writable });
 
   const failures: GenerateFailure[] = [];
-  let skipped = 0;
 
   // All queries feed one aggregated registry, so names must be unique project-wide.
   const discovered: Array<{ q: DiscoveredQuery; file: string }> = [];
   for (const file of sourceFiles) {
     for (const q of discover(file)) {
-      if (q.skip) {
-        skipped++;
-      } else {
-        discovered.push({ q, file });
-      }
+      discovered.push({ q, file });
     }
   }
   requireUniqueNames(discovered);
 
   const emitModels: EmitModel[] = [];
+  const neutralized: string[] = [];
   try {
     for (const { q, file } of discovered) {
       let described: Awaited<ReturnType<typeof intro.describe>>;
@@ -127,11 +123,10 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
       }
       const overrides = parseOverrides(q.sql);
       const resultFields = resolveFields({ described, catalog, overrides, columnOverrides, types });
-      emitModels.push({
-        name: q.name,
-        resultFields,
-        neutralized: q.neutralized,
-      });
+      emitModels.push({ name: q.name, resultFields });
+      if (q.neutralized) {
+        neutralized.push(q.name);
+      }
     }
   } finally {
     await intro.close();
@@ -142,8 +137,18 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     for (const f of failures) {
       console.error(`  ✗ ${f.file}:${f.line} ${f.name} — ${f.error}`);
       console.error(`    ${f.sql.trim().replace(/\s+/g, ' ').slice(0, SQL_PREVIEW_LONG)}`);
-      console.error('    (add /* @skip */ to type this one by hand)');
+      console.error('    (drop the `sql.Name` tag and hand-type it: `sql<Row[]>`...`)');
     }
+  }
+
+  // Neutralized queries had dynamic clauses rewritten to type them; the row shape
+  // holds, but a dynamic SELECT column could be dropped/retyped. Flag them here at
+  // generation time rather than commenting the generated file.
+  if (neutralized.length) {
+    console.error(
+      `\nℹ ${neutralized.length} query(ies) had dynamic clauses neutralized — verify SELECT columns:`,
+    );
+    console.error(`  ${neutralized.join(', ')}`);
   }
 
   const typed = emitModels.length;
@@ -166,14 +171,11 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   if (check && changed) {
     console.error('\n✗ generated types are stale — regenerate and commit.');
   } else {
-    const summary =
-      `${typed} typed` +
-      (skipped ? `, ${skipped} skipped` : '') +
-      (failures.length ? `, ${failures.length} failed` : '');
+    const summary = `${typed} typed${failures.length ? `, ${failures.length} failed` : ''}`;
     console.log(`${check ? '✓ up to date' : '✓ generated'} (${summary})`);
   }
 
-  return { typed, skipped, failures, changed };
+  return { typed, failures, changed };
 }
 
 // ---- helpers ----------------------------------------------------------------
