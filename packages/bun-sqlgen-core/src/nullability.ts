@@ -39,6 +39,20 @@ export function resolveFields(input: {
       ? columnOverrides[source.table]?.[source.column]
       : commentByName({ name: f.name, relations: described.relations, columnOverrides });
 
+    // A per-query `@type` is the most specific override there is: it names the exact
+    // result column and gives its full TS type verbatim (nullability included), so it
+    // wins over everything and skips the catalog/nullability heuristic entirely.
+    const inlineType = overrides.types.get(f.name);
+    if (inlineType) {
+      return {
+        name: f.name,
+        ts: inlineType,
+        nullable: false,
+        reason: 'override',
+        doc: comment?.doc,
+      };
+    }
+
     // Type: column-comment `@type` > OID mapping.
     const tsType = comment?.tsType;
     const { ts, note } = tsType ? { ts: tsType, note: undefined } : oidToTs({ oid: f.oid, types });
@@ -115,15 +129,17 @@ function resolveSource(input: {
   return table ? { table, column: prov.column } : null;
 }
 
-const NOT_NULL_PRAGMA = /@notNull\s+([\w\s]+)/g;
-const NULLABLE_PRAGMA = /@nullable\s+([\w\s]+)/g;
+// `@notNull a b` / `@nullable a b` stop at the first `@` so a following pragma on the
+// same comment isn't swallowed. `@type <col> <TsType>` takes one column then the rest
+// of the line as the (possibly multi-word) type, trimming a trailing block-comment `*/`.
+const NOT_NULL_PRAGMA = /@notNull\s+([^@\n*]+)/g;
+const NULLABLE_PRAGMA = /@nullable\s+([^@\n*]+)/g;
+const TYPE_PRAGMA = /@type\s+(\w+)\s+([^\n]+)/g;
 
-// Per-query overrides name the columns they apply to (`@notNull a b`). Typing a
-// column is a fact about the column, not a query — so `@type` lives only on a
-// `COMMENT ON COLUMN`, never here.
 export function parseOverrides(commentText = ''): Overrides {
   const notNull = new Set<string>();
   const nullable = new Set<string>();
+  const types = new Map<string, string>();
   for (const m of commentText.matchAll(NOT_NULL_PRAGMA)) {
     for (const c of m[1]!.trim().split(/\s+/)) {
       notNull.add(c);
@@ -134,7 +150,13 @@ export function parseOverrides(commentText = ''): Overrides {
       nullable.add(c);
     }
   }
-  return { notNull, nullable };
+  for (const m of commentText.matchAll(TYPE_PRAGMA)) {
+    const tsType = m[2]!.replace(/\s*\*\/\s*$/, '').trim();
+    if (tsType) {
+      types.set(m[1]!, tsType);
+    }
+  }
+  return { notNull, nullable, types };
 }
 
 const COMMENT_TYPE_MARKER = /@type\s+([^\n]+)/;
