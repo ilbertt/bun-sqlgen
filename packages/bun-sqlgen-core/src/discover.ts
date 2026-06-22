@@ -1,3 +1,4 @@
+import type { ReservedSQL, SavepointSQL, SQL, TransactionSQL } from 'bun';
 import ts from 'typescript';
 import type { DiscoveredQuery, WritableColumns } from '#types.ts';
 
@@ -387,9 +388,31 @@ function isBunSqlFile(fileName: string): boolean {
   return fileName.includes('bun-types') || fileName.includes('@types/bun');
 }
 
-// Does this expression carry Bun's `SQL` type (its declaring symbol is `SQL` from
-// bun-types/@types/bun)? Robust to how the tag was imported/aliased/re-exported,
-// and to our `withTypes` wrapper, whose type is an intersection over `SQL`.
+// Bun's family of SQL client types — the top-level client plus the scoped clients
+// handed to a `begin`/`savepoint`/`reserve` callback. A `tx.Name\`...\`` inside a
+// transaction is just as much a query as a top-level `sql.Name\`...\``. They're
+// matched by interface name against the user program's symbols, so the strings must
+// be Bun's exact names: `satisfies (keyof BunSqlClients)[]` rejects a mistyped entry,
+// and `BunSqlClients` references each type so a bun-types rename/removal fails to
+// compile. (TS can't reflect a type to its name string, so a name changing *value*
+// while keeping its shape is the only drift this can't catch.)
+interface BunSqlClients {
+  SQL: SQL;
+  TransactionSQL: TransactionSQL;
+  SavepointSQL: SavepointSQL;
+  ReservedSQL: ReservedSQL;
+}
+const BUN_SQL_TYPES: ReadonlySet<string> = new Set([
+  'SQL',
+  'TransactionSQL',
+  'SavepointSQL',
+  'ReservedSQL',
+] satisfies (keyof BunSqlClients)[]);
+
+// Does this expression carry a Bun SQL client type (its declaring symbol is one of
+// the SQL family from bun-types/@types/bun)? Robust to how the tag was
+// imported/aliased/re-exported, and to our `withTypes` wrapper and typed transaction
+// client, whose types are intersections over those.
 function isBunSqlType(input: { expr: ts.Expression; checker: ts.TypeChecker }): boolean {
   return typeIsBunSql(input.checker.getTypeAtLocation(input.expr));
 }
@@ -397,7 +420,8 @@ function isBunSqlType(input: { expr: ts.Expression; checker: ts.TypeChecker }): 
 function typeIsBunSql(type: ts.Type): boolean {
   const sym = type.getSymbol() ?? type.aliasSymbol;
   if (
-    sym?.getName() === 'SQL' &&
+    sym &&
+    BUN_SQL_TYPES.has(sym.getName()) &&
     (sym.getDeclarations() ?? []).some((d) => isBunSqlFile(d.getSourceFile().fileName))
   ) {
     return true;
