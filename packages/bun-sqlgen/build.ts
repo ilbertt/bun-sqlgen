@@ -43,7 +43,7 @@ assertBuildSuccess({ buildResult: cliBuildResult });
 printBuildOutput({ buildResult: cliBuildResult });
 
 console.log('📚 Compiling library...');
-await Bun.$`bun --bun tsc -p tsconfig.build.json`;
+await Bun.$`bun run build:lib`;
 
 console.log('📄 Copying license...');
 await copyFile(ROOT_LICENSE_PATH, LICENSE_DESTINATION_PATH);

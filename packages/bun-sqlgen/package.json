@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "bun run build.ts",
+    "build:lib": "bun run --bun tsc -p tsconfig.build.json",
     "check:types": "bun run --bun tsc",
     "codegen": "parsh-codegen generate --commands src/cli/commands --out src/cli/command-tree.gen.ts --eager"
   },
