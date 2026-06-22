@@ -1,0 +1,15 @@
+{
+  "name": "@repo/example-check-only",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:queries": "bun-sqlgen generate 'src/**/*.ts' --migrations src/db/migrations --check-queries",
+    "check:types": "bun run check:queries && bun run --bun tsc"
+  },
+  "devDependencies": {
+    "@repo/bun-sqlgen": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

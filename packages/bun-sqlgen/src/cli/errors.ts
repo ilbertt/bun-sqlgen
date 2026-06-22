@@ -1,2 +1,2 @@
-/** Thrown when generation fails or (in `--check`) finds stale types. */
+/** Thrown when a query fails to plan, or a `--check*` mode finds stale types. */
 export class GenerationFailed extends Error {}

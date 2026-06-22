@@ -23,8 +23,10 @@ export interface GenerateOptions {
   queries: string | string[];
   /** Migrations directory, relative to `cwd`. */
   migrations: string;
-  /** Fail (don't write) if any generated file would change — the CI analog. */
-  check?: boolean;
+  /** Fail if any discovered query doesn't plan against the schema. Read-only (no write). */
+  checkQueries?: boolean;
+  /** Fail if the committed generated module is out of date. Read-only (no write). */
+  checkStale?: boolean;
   /** Explicit path to `sqlgen.config.{ts,js,mjs}`; auto-discovered otherwise. */
   configPath?: string;
   /** Output path for the aggregated module, relative to `cwd`. Defaults to `src/queries.gen.d.ts`. */
@@ -62,7 +64,10 @@ const SQL_PREVIEW_SHORT = 70;
  */
 export async function generate(options: GenerateOptions): Promise<GenerateResult> {
   const cwd = options.cwd ? resolve(options.cwd) : process.cwd();
-  const check = options.check ?? false;
+  const checkQueries = options.checkQueries ?? false;
+  const checkStale = options.checkStale ?? false;
+  // Any check mode is read-only; the file is written only on a plain generate.
+  const writeOutput = !checkQueries && !checkStale;
 
   // Explicit options win over config values.
   const config = await loadConfig({ root: cwd, explicit: options.configPath });
@@ -165,19 +170,27 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     });
     if (safeRead(outPath) !== contents) {
       changed = true;
-      if (check) {
-        console.error(`would change: ${relative(cwd, outPath)}`);
-      } else {
+      if (writeOutput) {
         writeFileSync(outPath, contents);
+      } else if (checkStale) {
+        console.error(`would change: ${relative(cwd, outPath)}`);
       }
     }
   }
 
-  if (check && changed) {
+  if (checkStale && changed) {
     console.error('\n✗ generated types are stale — regenerate and commit.');
   } else {
     const summary = `${typed} typed${failures.length ? `, ${failures.length} failed` : ''}`;
-    console.log(`${check ? '✓ up to date' : '✓ generated'} (${summary})`);
+    let status = '✓ queries valid';
+    if (failures.length) {
+      status = '✗ failed';
+    } else if (writeOutput) {
+      status = '✓ generated';
+    } else if (checkStale) {
+      status = '✓ up to date';
+    }
+    console.log(`${status} (${summary})`);
   }
 
   return { typed, failures, changed };

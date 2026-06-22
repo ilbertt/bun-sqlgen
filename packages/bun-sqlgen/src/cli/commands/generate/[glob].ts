@@ -26,16 +26,27 @@ export const command = defineCommand('generate [glob]', {
       schema: z.string().optional(),
       description: 'Path to sqlgen.config.{ts,js,mjs} (auto-discovered otherwise).',
     },
+    'check-queries': {
+      schema: z.boolean().optional(),
+      description: 'Fail if any discovered query does not plan against the schema. Writes nothing.',
+    },
+    'check-stale': {
+      schema: z.boolean().optional(),
+      description: 'Fail if the committed generated types are out of date. Writes nothing.',
+    },
     dialect: {
       schema: z.enum(['postgres', 'sqlite']).optional(),
       description: 'Database engine to introspect against (default postgres; overrides config).',
     },
     check: {
       schema: z.boolean().optional(),
-      description: 'Fail if generated types would change — the CI freshness check.',
+      description: 'Run all checks (queries + stale types); writes nothing — the CI default.',
     },
   },
   handler: async ({ params, options }) => {
+    // `--check` is the umbrella that runs every check.
+    const checkQueries = options['check-queries'] || options.check;
+    const checkStale = options['check-stale'] || options.check;
     const result = await generate({
       queries: params.glob,
       migrations: options.migrations,
@@ -43,10 +54,11 @@ export const command = defineCommand('generate [glob]', {
       packageName: options.package,
       configPath: options.config,
       dialect: options.dialect,
-      check: options.check,
+      checkQueries,
+      checkStale,
     });
     // generate() already reported details; throw only to set a non-zero exit (see main.ts).
-    if ((options.check && result.changed) || result.failures.length > 0) {
+    if ((checkStale && result.changed) || result.failures.length > 0) {
       throw new GenerationFailed();
     }
   },
