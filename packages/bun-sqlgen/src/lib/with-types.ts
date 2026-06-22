@@ -1,7 +1,5 @@
 import type { SQL } from 'bun';
-// Relative (not `#*`) so the emitted, published `index.d.ts` re-export chain
-// resolves for consumers, who don't have this package's subpath-imports map.
-import type { TypedSQL } from './registry.ts';
+import type { TypedSQL } from './registry';
 
 /**
  * Wrap a Bun `SQL` client so a `sql.QueryName` tagged template resolves to the

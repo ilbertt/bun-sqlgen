@@ -5,10 +5,6 @@ node_modules
 out
 dist
 *.tgz
-
-# generated published package source (copied into pkg/ at build time)
-/packages/bun-sqlgen/pkg/src
-
 # code coverage
 coverage
 *.lcov

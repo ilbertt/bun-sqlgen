@@ -5,6 +5,7 @@ const CATALOG = rootPackageJson.workspaces.catalog;
 export type GenericPackageJson = {
   name: string;
   dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
 };
 
 /**
@@ -27,11 +28,15 @@ export async function setPackageJsonDependencies({
   const sourcePackageJson: GenericPackageJson = await Bun.file(sourcePackageJsonPath).json();
   const targetPackageJson: GenericPackageJson = await Bun.file(targetPackageJsonPath).json();
   const sourceDeps = sourcePackageJson.dependencies ?? {};
+  const sourcePeerDeps = sourcePackageJson.peerDependencies ?? {};
 
-  const resolve = (names: string[]): Record<string, string> =>
-    Object.fromEntries(
-      names.map((name) => [name, resolveVersion({ name, version: sourceDeps[name] })]),
-    );
+  const resolve = (names: string[]): Record<string, string> => {
+    const entries = names.map((name) => [
+      name,
+      resolveVersion({ name, version: sourceDeps[name] || sourcePeerDeps[name] }),
+    ]);
+    return Object.fromEntries(entries);
+  };
 
   const updatedTargetPackageJson = {
     ...targetPackageJson,

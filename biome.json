@@ -89,6 +89,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["examples/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noMagicNumbers": "off"
+          }
+        }
+      }
     }
   ]
 }
