@@ -1,19 +1,4 @@
-export type ColumnType = 'text' | 'integer' | 'real' | 'blob';
+/** biome-ignore-all lint/performance/noBarrelFile: index is the only file allowed to re-export */
 
-export interface TableSchema {
-  name: string;
-  columns: Record<string, ColumnType>;
-}
-
-/**
- * Generates a `CREATE TABLE` statement from a table schema.
- *
- * This is a placeholder scaffold for the `@ilbertt/bun-sqlgen` package — replace
- * it with the real SQL generation API.
- */
-export function createTableSql({ name, columns }: TableSchema): string {
-  const definitions = Object.entries(columns).map(
-    ([column, type]) => `  ${column} ${type.toUpperCase()}`,
-  );
-  return `CREATE TABLE ${name} (\n${definitions.join(',\n')}\n);`;
-}
+export type { QueryResults, TypedSQL } from './lib/registry';
+export { withTypes } from './lib/with-types';

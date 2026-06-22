@@ -14,6 +14,9 @@
     "bun": "^1.3.0",
     "node": "please-use-bun"
   },
+  "bin": {
+    "bun-sqlgen": "./dist/cli/main.js"
+  },
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -22,10 +25,15 @@
     }
   },
   "files": [
-    "dist/*",
+    "dist",
     "package.json",
     "README.md",
     "LICENSE"
   ],
-  "dependencies": {}
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  }
 }

@@ -1,8 +1,13 @@
 # bun-sqlgen
 
-SQL generation utilities for [Bun](https://bun.sh), developed as a monorepo powered by [Bun](https://bun.sh) and [Turborepo](https://turborepo.dev/).
+sqlx-style typed SQL for [`Bun.sql`](https://bun.sh/docs/runtime/sql): write raw
+SQL in tagged templates, and a codegen step validates each query against an
+in-process Postgres and emits the result types — so plain `tsc` catches wrong
+property access and null-unsafety. Developed as a monorepo powered by
+[Bun](https://bun.sh) and [Turborepo](https://turborepo.dev/).
 
-The published package is [`@ilbertt/bun-sqlgen`](./packages/bun-sqlgen/pkg/README.md).
+The published package is [`@ilbertt/bun-sqlgen`](./packages/bun-sqlgen/pkg/README.md) —
+see its README for install and usage.
 
 ## Requirements
 
@@ -15,10 +20,10 @@ bun install
 bun run build
 ```
 
-Run the example:
+Try the codegen on the example:
 
 ```sh
-bun --filter @repo/example-simple start
+bun --filter @repo/example-simple codegen   # regenerates examples/simple/src/queries.gen.ts
 ```
 
 ## Tooling

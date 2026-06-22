@@ -12,7 +12,9 @@
       "!**/node_modules",
       "!**/dist",
       "!**/bun.lock",
-      "!**/*.lock"
+      "!**/*.lock",
+      "!**/*.gen.ts",
+      "!**/*.gen.d.ts"
     ]
   },
   "formatter": {
@@ -84,6 +86,16 @@
         "rules": {
           "style": {
             "useFilenamingConvention": "error"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["examples/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noMagicNumbers": "off"
           }
         }
       }

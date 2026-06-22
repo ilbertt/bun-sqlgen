@@ -3,10 +3,11 @@
   "compilerOptions": {
     "noEmit": false,
     "declaration": true,
-    "emitDeclarationOnly": true,
+    "emitDeclarationOnly": false,
+    "allowImportingTsExtensions": false,
     "outDir": "./pkg/dist",
     "rootDir": "./src"
   },
   "include": ["src"],
-  "exclude": ["node_modules", "pkg"]
+  "exclude": ["node_modules", "pkg", "src/cli"]
 }
