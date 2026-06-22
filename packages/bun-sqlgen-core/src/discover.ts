@@ -1,3 +1,4 @@
+import type { ReservedSQL, SavepointSQL, SQL, TransactionSQL } from 'bun';
 import ts from 'typescript';
 import type { Dialect, DiscoveredQuery, WritableColumns } from '#types.ts';
 
@@ -138,7 +139,6 @@ function discover(input: {
       sql,
       paramCount: ctx.paramCount,
       neutralized: !!ctx.neutralized,
-      skip: hasPragma({ node, sf, tag: 'skip' }),
       line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
     });
   }
@@ -351,8 +351,8 @@ function neutralToken(input: { sqlSoFar: string; ctx: DiscoverCtx }): string {
       return col;
     }
   }
-  // SELECT-list: keep the column as NULL so the row shape is preserved (`@skip` the
-  // query to hand-type it if the real column matters).
+  // SELECT-list: keep the column as NULL so the row shape is preserved (drop the
+  // `sql.Name` tag and hand-type the query if the real column type matters).
   if (SELECT_LIST_BOUNDARY.test(tail)) {
     return 'NULL';
   }
@@ -400,9 +400,31 @@ function isBunSqlFile(fileName: string): boolean {
   return fileName.includes('bun-types') || fileName.includes('@types/bun');
 }
 
-// Does this expression carry Bun's `SQL` type (its declaring symbol is `SQL` from
-// bun-types/@types/bun)? Robust to how the tag was imported/aliased/re-exported,
-// and to our `withTypes` wrapper, whose type is an intersection over `SQL`.
+// Bun's family of SQL client types — the top-level client plus the scoped clients
+// handed to a `begin`/`savepoint`/`reserve` callback. A `tx.Name\`...\`` inside a
+// transaction is just as much a query as a top-level `sql.Name\`...\``. They're
+// matched by interface name against the user program's symbols, so the strings must
+// be Bun's exact names: `satisfies (keyof BunSqlClients)[]` rejects a mistyped entry,
+// and `BunSqlClients` references each type so a bun-types rename/removal fails to
+// compile. (TS can't reflect a type to its name string, so a name changing *value*
+// while keeping its shape is the only drift this can't catch.)
+interface BunSqlClients {
+  SQL: SQL;
+  TransactionSQL: TransactionSQL;
+  SavepointSQL: SavepointSQL;
+  ReservedSQL: ReservedSQL;
+}
+const BUN_SQL_TYPES: ReadonlySet<string> = new Set([
+  'SQL',
+  'TransactionSQL',
+  'SavepointSQL',
+  'ReservedSQL',
+] satisfies (keyof BunSqlClients)[]);
+
+// Does this expression carry a Bun SQL client type (its declaring symbol is one of
+// the SQL family from bun-types/@types/bun)? Robust to how the tag was
+// imported/aliased/re-exported, and to our `withTypes` wrapper and typed transaction
+// client, whose types are intersections over those.
 function isBunSqlType(input: { expr: ts.Expression; checker: ts.TypeChecker }): boolean {
   return typeIsBunSql(input.checker.getTypeAtLocation(input.expr));
 }
@@ -410,30 +432,11 @@ function isBunSqlType(input: { expr: ts.Expression; checker: ts.TypeChecker }): 
 function typeIsBunSql(type: ts.Type): boolean {
   const sym = type.getSymbol() ?? type.aliasSymbol;
   if (
-    sym?.getName() === 'SQL' &&
+    sym &&
+    BUN_SQL_TYPES.has(sym.getName()) &&
     (sym.getDeclarations() ?? []).some((d) => isBunSqlFile(d.getSourceFile().fileName))
   ) {
     return true;
   }
   return type.isIntersection() && type.types.some(typeIsBunSql);
-}
-
-// `/* @skip */` opts a query out of generation (type it by hand instead).
-function hasPragma(input: {
-  node: ts.TaggedTemplateExpression;
-  sf: ts.SourceFile;
-  tag: string;
-}): boolean {
-  return new RegExp(`@${input.tag}\\b`).test(annotationText(input));
-}
-
-// Comments just before the tag, plus a leading comment inside the SQL.
-function annotationText(input: { node: ts.TaggedTemplateExpression; sf: ts.SourceFile }): string {
-  const { node, sf } = input;
-  const before = (ts.getLeadingCommentRanges(sf.text, node.pos) ?? [])
-    .map((r) => sf.text.slice(r.pos, r.end))
-    .join('\n');
-  const tpl = node.template;
-  const head = ts.isNoSubstitutionTemplateLiteral(tpl) ? tpl.text : tpl.head.text;
-  return `${before}\n${head}`;
 }

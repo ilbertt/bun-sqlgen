@@ -2,7 +2,7 @@
 // Run the generator to refresh.
 
 /** Result of query `ListDeals`. */
-export interface IListDealsResult {
+interface IListDealsResult {
     id: number;
     status: string;
     amount: number;
@@ -10,7 +10,7 @@ export interface IListDealsResult {
 }
 
 /** Result of query `GetDeal`. */
-export interface IGetDealResult {
+interface IGetDealResult {
     id: number;
     amount: number;
     attachment: Uint8Array | null;
@@ -18,26 +18,26 @@ export interface IGetDealResult {
 }
 
 /** Result of query `GetUserDeals`. */
-export interface IGetUserDealsResult {
+interface IGetUserDealsResult {
     id: number | null;
     email: string | null;
     amount: number | null;
 }
 
 /** Result of query `UserEmails`. */
-export interface IUserEmailsResult {
+interface IUserEmailsResult {
     email: string;
     amount: number | null;
 }
 
 /** Result of query `DealStats`. */
-export interface IDealStatsResult {
+interface IDealStatsResult {
     total: number | null;
     loud: unknown | null;
 }
 
 /** Result of query `SearchDeals`. */
-export interface ISearchDealsResult {
+interface ISearchDealsResult {
     id: number;
     status: string;
     amount: number;
@@ -53,3 +53,5 @@ declare module "@repo/bun-sqlgen" {
         SearchDeals: ISearchDealsResult;
     }
 }
+
+export {};

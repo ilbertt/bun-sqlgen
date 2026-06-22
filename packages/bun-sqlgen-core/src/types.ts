@@ -46,10 +46,16 @@ export interface DescribeResult {
   relations: string[];
 }
 
-/** Per-query escape hatches parsed from leading comments (`@notNull`/`@nullable`). */
+/**
+ * Per-query escape hatches parsed from leading comments: `@notNull`/`@nullable` set a
+ * column's nullability; `@type <col> <TsType>` sets its full TS type verbatim — the
+ * only way to type an expression column (a `json_agg(...)`, `paradedb.score(...)`, …)
+ * that has no base column to carry a `COMMENT ON COLUMN`.
+ */
 export interface Overrides {
   notNull: Set<string>;
   nullable: Set<string>;
+  types: Map<string, string>;
 }
 
 /** table -> column -> raw Postgres `COMMENT ON COLUMN` text. */
@@ -90,14 +96,12 @@ export interface DiscoveredQuery {
   sql: string;
   paramCount: number;
   neutralized: boolean;
-  skip: boolean;
   line: number;
 }
 
 export interface EmitModel {
   name: string;
   resultFields: ResolvedField[];
-  neutralized: boolean;
 }
 
 /** Which engine introspects the migrations at build time. Defaults to `postgres`. */
