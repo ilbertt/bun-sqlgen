@@ -1,6 +1,5 @@
 import { withTypes } from '@repo/bun-sqlgen';
 import { SQL } from 'bun';
-import type { ICountDealsResult } from './queries.gen';
 
 const sql = withTypes(new SQL(Bun.env.DATABASE_URL ?? 'postgres://localhost/example'));
 
@@ -97,11 +96,8 @@ export async function getDealDetails(dealId: number) {
   `;
 }
 
-// The explicit-generic escape hatch still works on the wrapped client: a `@name`
-// comment names the generated interface, which the module also exports.
 export async function countDeals() {
-  return await sql<ICountDealsResult[]>`
-    /* @name countDeals */
+  return await sql.CountDeals`
     SELECT count(*) AS total FROM deals
   `;
 }

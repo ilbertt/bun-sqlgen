@@ -14,7 +14,7 @@ export function printNode(node: ts.Node): string {
 
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
-// Named so call sites can also write the explicit `sql<IFooResult[]>` form.
+// The exported interface name for a query's row (also the registry value type).
 export const resultName = (name: string): string => `I${cap(name)}Result`;
 
 const VALID_IDENTIFIER = /^[A-Za-z_$][\w$]*$/;

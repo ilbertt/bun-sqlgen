@@ -10,9 +10,8 @@ import type { DiscoveredQuery, WritableColumns } from '#types.ts';
  * tag's type is Bun's `SQL` (or our `withTypes` wrapper, an intersection over it)
  * — so aliases/re-exports/`Bun.sql`/wrapped clients all resolve.
  *
- * Two query forms are recognized:
- *   - explicit generic: `sql<Row[]>\`...\`` — name from a `@name` comment.
- *   - named tag:        `sql.MyQuery\`...\`` — name from the property.
+ * A query is a named tag — `sql.MyQuery\`...\`` — taking its name from the property.
+ * A bare `sql\`...\`` is a composable fragment, not a query.
  */
 const COMPILER_OPTIONS: ts.CompilerOptions = {
   target: ts.ScriptTarget.ES2022,
@@ -98,26 +97,21 @@ function discover(input: {
   // see the wrapper type.
   const bindings = collectTypedSqlBindings({ sf, checker });
 
-  // Two query forms: explicit generic (`sql<Row[]>`) and named tag (`sql.Name`).
-  // A bare `sql\`...\`` (no generic, no property) is a composable fragment.
-  const found: Array<{ node: ts.TaggedTemplateExpression; name: string; explicit: boolean }> = [];
+  // A query is a named tag, `sql.Name\`...\``; its name is the property. A bare
+  // `sql\`...\`` (no property) is a composable fragment, not a query.
+  const found: Array<{ node: ts.TaggedTemplateExpression; name: string }> = [];
   (function scan(node: ts.Node): void {
     if (ts.isTaggedTemplateExpression(node)) {
-      if (isSql(node) && node.typeArguments?.length) {
-        const name = explicitName({ node, sf });
-        found.push({ node, name: name ?? '', explicit: !!name });
-      } else {
-        const named = namedTag({ node, checker, bindings });
-        if (named) {
-          found.push({ node, name: named, explicit: true });
-        }
+      const name = namedTag({ node, checker, bindings });
+      if (name) {
+        found.push({ node, name });
       }
     }
     ts.forEachChild(node, scan);
   })(sf);
 
   const out: DiscoveredQuery[] = [];
-  for (const { node, name, explicit } of found) {
+  for (const { node, name } of found) {
     const ctx: DiscoverCtx = {
       symbols,
       paramCount: 0,
@@ -129,7 +123,6 @@ function discover(input: {
     const sql = expand({ tpl: node.template, ctx });
     out.push({
       name,
-      explicit,
       sql,
       paramCount: ctx.paramCount,
       neutralized: !!ctx.neutralized,
@@ -411,18 +404,6 @@ function typeIsBunSql(type: ts.Type): boolean {
     return true;
   }
   return type.isIntersection() && type.types.some(typeIsBunSql);
-}
-
-const NAME_PRAGMA = /@name\s+(\w+)/;
-
-// A query's name comes only from an explicit `@name Foo` (before the tag or inside
-// the SQL) — never inferred from the enclosing function/const.
-function explicitName(input: {
-  node: ts.TaggedTemplateExpression;
-  sf: ts.SourceFile;
-}): string | null {
-  const m = NAME_PRAGMA.exec(annotationText(input));
-  return m ? m[1]! : null;
 }
 
 // `/* @skip */` opts a query out of generation (type it by hand instead).

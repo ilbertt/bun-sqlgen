@@ -33,14 +33,12 @@ export function resultInterface(q: EmitModel): ts.InterfaceDeclaration {
     undefined,
     q.resultFields.map(fieldSignature),
   );
-  if (q.explicit) {
-    ts.addSyntheticLeadingComment(
-      node,
-      ts.SyntaxKind.MultiLineCommentTrivia,
-      `* Result of query \`${q.name}\`. `,
-      true,
-    );
-  }
+  ts.addSyntheticLeadingComment(
+    node,
+    ts.SyntaxKind.MultiLineCommentTrivia,
+    `* Result of query \`${q.name}\`. `,
+    true,
+  );
   if (q.neutralized) {
     for (const line of [
       ' NOTE: dynamic clauses (composed fragments) were neutralized for typing;',

@@ -85,7 +85,6 @@ export interface ResolvedField {
 
 export interface DiscoveredQuery {
   name: string;
-  explicit: boolean;
   sql: string;
   paramCount: number;
   neutralized: boolean;
@@ -95,7 +94,6 @@ export interface DiscoveredQuery {
 
 export interface EmitModel {
   name: string;
-  explicit: boolean;
   resultFields: ResolvedField[];
   neutralized: boolean;
 }

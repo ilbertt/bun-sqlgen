@@ -96,8 +96,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   const failures: GenerateFailure[] = [];
   let skipped = 0;
 
-  // All queries feed one aggregated module, so names are unique project-wide and
-  // unnamed queries are numbered across files.
+  // All queries feed one aggregated registry, so names must be unique project-wide.
   const discovered: Array<{ q: DiscoveredQuery; file: string }> = [];
   for (const file of sourceFiles) {
     for (const q of discover(file)) {
@@ -108,7 +107,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
       }
     }
   }
-  assignNames(discovered);
+  requireUniqueNames(discovered);
 
   const emitModels: EmitModel[] = [];
   try {
@@ -130,7 +129,6 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
       const resultFields = resolveFields({ described, catalog, overrides, columnOverrides, types });
       emitModels.push({
         name: q.name,
-        explicit: q.explicit,
         resultFields,
         neutralized: q.neutralized,
       });
@@ -180,16 +178,11 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
 
 // ---- helpers ----------------------------------------------------------------
 
-// Number unnamed queries (`name === ''`) across the whole project, and reject two
-// named queries sharing a name — both would emit clashing interfaces / registry keys.
-function assignNames(discovered: Array<{ q: DiscoveredQuery; file: string }>): void {
+// Two queries sharing a name (the `sql.Name` property) would emit clashing
+// interfaces and registry keys.
+function requireUniqueNames(discovered: Array<{ q: DiscoveredQuery; file: string }>): void {
   const seen = new Map<string, string>();
-  let unnamed = 0;
   for (const { q, file } of discovered) {
-    if (!q.name) {
-      q.name = `UnnamedQuery${++unnamed}`;
-      continue;
-    }
     const at = `${basename(file)}:${q.line}`;
     const prev = seen.get(q.name);
     if (prev) {
@@ -197,7 +190,7 @@ function assignNames(discovered: Array<{ q: DiscoveredQuery; file: string }>): v
       throw new Error(
         `duplicate query name "${q.name}" (${prev} and ${at})\n` +
           `  ${preview}…\n` +
-          '  Names must be unique: rename the property or the /* @name MyQuery */.',
+          '  Names must be unique: rename one of the `sql.Name` tags.',
       );
     }
     seen.set(q.name, at);

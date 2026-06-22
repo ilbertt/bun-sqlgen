@@ -23,9 +23,8 @@ Bun-native: fragments, prepared-statement caching, and injection-safe binding ar
 all preserved.
 
 > Why a property and not the query text? TypeScript widens tagged-template strings
-> to `string`, so it can't read a `@name` comment out of the template at the type
-> level — but a property access it preserves exactly. The name lives where `tsc`
-> can actually see it.
+> to `string`, so it can't read anything out of the template at the type level — but
+> a property access it preserves exactly. The name lives where `tsc` can see it.
 
 ## Installation
 
@@ -95,9 +94,8 @@ Now `user.emial` is a compile error and `user.display_name.length` is flagged as
 possibly-null — all by plain `tsc`.
 
 The untyped `sql\`...\`` escape hatch and real methods (`sql.begin`, …) keep
-working on the wrapped client. The interfaces are also exported, so the explicit
-`sql<IGetUserResult[]>\`/* @name GetUser */ ...\`` form works too (import the
-interface from `./queries.gen`).
+working on the wrapped client. The result interfaces are exported too, so you can
+import `IGetUserResult` directly if you need to name the row type elsewhere.
 
 ## CLI
 
@@ -152,9 +150,7 @@ export default {
 
 A query's name is the **property you tag it with** — `sql.GetUser\`...\`` becomes
 `IGetUserResult` and the `GetUser` registry key. Names must be unique across the
-whole project (they share one registry). Using the explicit-generic escape hatch
-instead? Name it with a `/* @name Foo */` comment (before the tag or inside the
-SQL); an unnamed one falls back to `IUnnamedQueryNResult` as a nudge to name it.
+whole project (they share one registry).
 
 ## Overrides
 
@@ -165,7 +161,6 @@ nullable. Override the nullability of a query's columns with leading-comment
 pragmas — the sqlx `col!`/`col?` escape hatch:
 
 ```sql
-/* @name report */
 /* @notNull total */
 /* @nullable note */
 SELECT count(*) AS total, note FROM ...

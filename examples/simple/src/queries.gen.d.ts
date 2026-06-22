@@ -74,7 +74,7 @@ export interface IGetDealDetailsResult {
     } | null;
 }
 
-/** Result of query `countDeals`. */
+/** Result of query `CountDeals`. */
 export interface ICountDealsResult {
     total: string | null;
 }
@@ -89,6 +89,6 @@ declare module "@repo/bun-sqlgen" {
         RecentDeals: IRecentDealsResult;
         GetDealMeta: IGetDealMetaResult;
         GetDealDetails: IGetDealDetailsResult;
-        countDeals: ICountDealsResult;
+        CountDeals: ICountDealsResult;
     }
 }
