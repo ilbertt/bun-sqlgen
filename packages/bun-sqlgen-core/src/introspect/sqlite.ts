@@ -14,8 +14,10 @@ import type {
 
 /**
  * In-memory SQLite (`bun:sqlite`) with migrations applied — the build-time DB, the
- * analog of PGlite for the Postgres dialect. SQLite has no "describe without
- * executing" protocol, so each query's result columns come from a prepared
+ * analog of PGlite for the Postgres dialect. We use `bun:sqlite`, not `Bun.SQL` (the
+ * runtime client), because only its prepared `Statement` exposes result-column
+ * metadata without executing the query. SQLite has no "describe without executing"
+ * protocol, so each query's result columns come from a prepared
  * statement's metadata: `columnNames`, `declaredTypes` (a declared type per column,
  * `null` for expressions — our column-vs-expression signal), and `columnTypes` (the
  * storage class of the first row, a fallback for expressions over a non-empty
