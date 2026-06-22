@@ -100,7 +100,7 @@ import `IGetUserResult` directly if you need to name the row type elsewhere.
 ## CLI
 
 ```sh
-bunx bun-sqlgen generate <glob> --migrations <dir> [--out <file>] [--package <name>] [--config <file>] [--check]
+bunx bun-sqlgen generate <glob> --migrations <dir> [--out <file>] [--package <name>] [--config <file>] [--check | --check-queries | --check-stale]
 ```
 
 | argument | meaning |
@@ -110,7 +110,15 @@ bunx bun-sqlgen generate <glob> --migrations <dir> [--out <file>] [--package <na
 | `--out <file>` | output path for the generated module (default `src/queries.gen.d.ts`). |
 | `--package <name>` | package whose `QueryResults` registry to augment (default `@ilbertt/bun-sqlgen`) — the specifier you import `withTypes` from. |
 | `--config <file>` | explicit path to `sqlgen.config.{ts,js,mjs}`. |
-| `--check` | fail (exit 1) if anything would change — the `sqlx prepare --check` analog for CI. |
+| `--check-queries` | fail (exit 1) if any discovered query doesn't plan against the schema. Writes nothing — a build-time SQL linter that needs no committed output. |
+| `--check-stale` | fail (exit 1) if the committed generated module is out of date. Writes nothing — the `sqlx prepare --check` freshness analog. |
+| `--check` | run **all** checks (queries + stale types); writes nothing. The one-flag CI default. |
+
+The `--check*` modes never write — wire them into CI or a pre-commit hook. They
+nest: `--check` ≡ `--check-queries --check-stale`. Use `--check-stale` (or `--check`)
+when you commit `queries.gen.d.ts` and consume the result types; reach for
+`--check-queries` alone when you only want the SQL validated and don't keep a
+generated file at all.
 
 Paths resolve relative to the current directory. A suggested wiring in
 `package.json`:
