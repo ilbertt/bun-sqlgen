@@ -34,6 +34,15 @@
         "typescript": "catalog:",
       },
     },
+    "examples/sqlite": {
+      "name": "@repo/example-sqlite",
+      "devDependencies": {
+        "@repo/bun-sqlgen": "workspace:*",
+        "@repo/typescript-config": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "examples/with-config": {
       "name": "@repo/example-with-config",
       "devDependencies": {
@@ -164,6 +173,8 @@
     "@repo/example-check-only": ["@repo/example-check-only@workspace:examples/check-only"],
 
     "@repo/example-simple": ["@repo/example-simple@workspace:examples/simple"],
+
+    "@repo/example-sqlite": ["@repo/example-sqlite@workspace:examples/sqlite"],
 
     "@repo/example-with-config": ["@repo/example-with-config@workspace:examples/with-config"],
 

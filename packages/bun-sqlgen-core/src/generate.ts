@@ -3,9 +3,9 @@ import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createDiscoverer } from '#discover.ts';
 import { emitModule } from '#emit/index.ts';
-import { createIntrospector } from '#introspect.ts';
+import { createIntrospector } from '#introspect/index.ts';
 import { parseColumnComments, parseOverrides, resolveFields } from '#nullability.ts';
-import type { DiscoveredQuery, EmitModel, SqlgenConfig } from '#types.ts';
+import type { Dialect, DiscoveredQuery, EmitModel, SqlgenConfig } from '#types.ts';
 
 // Where the aggregated module lands when `--out` is omitted.
 const DEFAULT_OUT = 'src/queries.gen.d.ts';
@@ -35,6 +35,8 @@ export interface GenerateOptions {
   packageName?: string;
   /** Base directory for globs, migrations, and tsconfig lookup. Defaults to cwd. */
   cwd?: string;
+  /** Database engine to introspect against. Overrides config; defaults to `postgres`. */
+  dialect?: Dialect;
 }
 
 export interface GenerateFailure {
@@ -47,7 +49,6 @@ export interface GenerateFailure {
 
 export interface GenerateResult {
   typed: number;
-  skipped: number;
   failures: GenerateFailure[];
   changed: boolean;
 }
@@ -56,9 +57,10 @@ const SQL_PREVIEW_LONG = 90;
 const SQL_PREVIEW_SHORT = 70;
 
 /**
- * The `sqlx prepare` analog: discover `sql<Row[]>` tags -> describe against
- * PGlite -> resolve types/nullability -> write `<base>.gen.d.ts` siblings. Source
- * files are never touched; you import the generated `IFooResult` types yourself.
+ * The `sqlx prepare` analog: discover `sql.Name\`...\`` tags -> describe each
+ * against PGlite -> resolve types/nullability -> write one aggregated module that
+ * augments the package's `QueryResults` registry. Source files are never touched;
+ * `withTypes` reads each row type from the registry at the call site.
  */
 export async function generate(options: GenerateOptions): Promise<GenerateResult> {
   const cwd = options.cwd ? resolve(options.cwd) : process.cwd();
@@ -84,37 +86,36 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   }
   const sourceFiles = [...matched].filter((f) => f !== outPath && !isGenerated(f));
 
+  // Explicit `--dialect` wins over config; default Postgres. Extensions are a
+  // PGlite (Postgres) concept; a SQLite config carries none.
+  const dialect = options.dialect ?? config.dialect ?? 'postgres';
   const intro = await createIntrospector({
+    dialect,
     migrationsDir,
-    extensions: config.extensions,
     prelude: config.prelude,
     transformMigration: config.transformMigration,
+    extensions: config.dialect === 'sqlite' ? undefined : config.extensions,
   });
   const catalog = await intro.catalog();
   const columnOverrides = parseColumnComments(await intro.columnComments());
-  const types = await intro.types();
   const writable = await intro.writableColumns();
 
   // `writable` lets SET-clause neutralization self-assign a real column.
-  const discover = createDiscoverer({ projectRoot: cwd, files: sourceFiles, writable });
+  const discover = createDiscoverer({ projectRoot: cwd, files: sourceFiles, writable, dialect });
 
   const failures: GenerateFailure[] = [];
-  let skipped = 0;
 
   // All queries feed one aggregated registry, so names must be unique project-wide.
   const discovered: Array<{ q: DiscoveredQuery; file: string }> = [];
   for (const file of sourceFiles) {
     for (const q of discover(file)) {
-      if (q.skip) {
-        skipped++;
-      } else {
-        discovered.push({ q, file });
-      }
+      discovered.push({ q, file });
     }
   }
   requireUniqueNames(discovered);
 
   const emitModels: EmitModel[] = [];
+  const neutralized: string[] = [];
   try {
     for (const { q, file } of discovered) {
       let described: Awaited<ReturnType<typeof intro.describe>>;
@@ -131,12 +132,11 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
         continue; // type what we can; report the rest in the summary
       }
       const overrides = parseOverrides(q.sql);
-      const resultFields = resolveFields({ described, catalog, overrides, columnOverrides, types });
-      emitModels.push({
-        name: q.name,
-        resultFields,
-        neutralized: q.neutralized,
-      });
+      const resultFields = resolveFields({ described, catalog, overrides, columnOverrides });
+      emitModels.push({ name: q.name, resultFields });
+      if (q.neutralized) {
+        neutralized.push(q.name);
+      }
     }
   } finally {
     await intro.close();
@@ -147,8 +147,18 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     for (const f of failures) {
       console.error(`  ✗ ${f.file}:${f.line} ${f.name} — ${f.error}`);
       console.error(`    ${f.sql.trim().replace(/\s+/g, ' ').slice(0, SQL_PREVIEW_LONG)}`);
-      console.error('    (add /* @skip */ to type this one by hand)');
+      console.error('    (drop the `sql.Name` tag and hand-type it: `sql<Row[]>`...`)');
     }
+  }
+
+  // Neutralized queries had dynamic clauses rewritten to type them; the row shape
+  // holds, but a dynamic SELECT column could be dropped/retyped. Flag them here at
+  // generation time rather than commenting the generated file.
+  if (neutralized.length) {
+    console.error(
+      `\nℹ ${neutralized.length} query(ies) had dynamic clauses neutralized — verify SELECT columns:`,
+    );
+    console.error(`  ${neutralized.join(', ')}`);
   }
 
   const typed = emitModels.length;
@@ -171,10 +181,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   if (checkStale && changed) {
     console.error('\n✗ generated types are stale — regenerate and commit.');
   } else {
-    const summary =
-      `${typed} typed` +
-      (skipped ? `, ${skipped} skipped` : '') +
-      (failures.length ? `, ${failures.length} failed` : '');
+    const summary = `${typed} typed${failures.length ? `, ${failures.length} failed` : ''}`;
     let status = '✓ queries valid';
     if (failures.length) {
       status = '✗ failed';
@@ -186,7 +193,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     console.log(`${status} (${summary})`);
   }
 
-  return { typed, skipped, failures, changed };
+  return { typed, failures, changed };
 }
 
 // ---- helpers ----------------------------------------------------------------

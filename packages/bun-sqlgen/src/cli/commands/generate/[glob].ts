@@ -34,6 +34,10 @@ export const command = defineCommand('generate [glob]', {
       schema: z.boolean().optional(),
       description: 'Fail if the committed generated types are out of date. Writes nothing.',
     },
+    dialect: {
+      schema: z.enum(['postgres', 'sqlite']).optional(),
+      description: 'Database engine to introspect against (default postgres; overrides config).',
+    },
     check: {
       schema: z.boolean().optional(),
       description: 'Run all checks (queries + stale types); writes nothing — the CI default.',
@@ -49,6 +53,7 @@ export const command = defineCommand('generate [glob]', {
       out: options.out,
       packageName: options.package,
       configPath: options.config,
+      dialect: options.dialect,
       checkQueries,
       checkStale,
     });

@@ -2,7 +2,7 @@
 // Run the generator to refresh.
 
 /** Result of query `GetUserDeals`. */
-export interface IGetUserDealsResult {
+interface IGetUserDealsResult {
     id: string;
     email: string;
     display_name: string | null;
@@ -11,14 +11,14 @@ export interface IGetUserDealsResult {
 }
 
 /** Result of query `ListDeals`. */
-export interface IListDealsResult {
+interface IListDealsResult {
     id: string;
     status: string;
     amount: string;
 }
 
 /** Result of query `GetDealSummaries`. */
-export interface IGetDealSummariesResult {
+interface IGetDealSummariesResult {
     id: string;
     status: string;
     email: string;
@@ -29,7 +29,7 @@ export interface IGetDealSummariesResult {
 }
 
 /** Result of query `ListDealDetails`. */
-export interface IListDealDetailsResult {
+interface IListDealDetailsResult {
     deal_id: string;
     status: string;
     amount: string;
@@ -39,20 +39,20 @@ export interface IListDealDetailsResult {
 }
 
 /** Result of query `SearchDeals`. */
-export interface ISearchDealsResult {
+interface ISearchDealsResult {
     id: string;
     status: string;
     amount: string;
 }
 
 /** Result of query `RecentDeals`. */
-export interface IRecentDealsResult {
+interface IRecentDealsResult {
     id: string;
     status: string;
 }
 
 /** Result of query `GetDealMeta`. */
-export interface IGetDealMetaResult {
+interface IGetDealMetaResult {
     id: string;
     stage: "lead" | "negotiation" | "won" | "lost";
     tags: string[];
@@ -65,7 +65,7 @@ export interface IGetDealMetaResult {
 }
 
 /** Result of query `GetDealDetails`. */
-export interface IGetDealDetailsResult {
+interface IGetDealDetailsResult {
     id: string;
     /** Free-form metadata captured during the deal. */
     details: {
@@ -75,7 +75,7 @@ export interface IGetDealDetailsResult {
 }
 
 /** Result of query `CountDeals`. */
-export interface ICountDealsResult {
+interface ICountDealsResult {
     total: string | null;
 }
 
@@ -92,3 +92,5 @@ declare module "@repo/bun-sqlgen" {
         CountDeals: ICountDealsResult;
     }
 }
+
+export {};

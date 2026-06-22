@@ -2,7 +2,7 @@
 // Run the generator to refresh.
 
 /** Result of query `GetArticle`. */
-export interface IGetArticleResult {
+interface IGetArticleResult {
     id: string;
     /** Case-insensitive URL slug. */
     slug: string;
@@ -12,7 +12,7 @@ export interface IGetArticleResult {
 }
 
 /** Result of query `ListArticlesWithAuthor`. */
-export interface IListArticlesWithAuthorResult {
+interface IListArticlesWithAuthorResult {
     id: string;
     title: string;
     /** Case-insensitive contact address. */
@@ -26,3 +26,5 @@ declare module "@repo/bun-sqlgen" {
         ListArticlesWithAuthor: IListArticlesWithAuthorResult;
     }
 }
+
+export {};
