@@ -8,11 +8,19 @@ consumed as source via its `exports`.
 ## Pipeline
 
 ```
-discover sql<Row[]> tags (TS AST)
-  → describe against PGlite (validity, OIDs, EXPLAIN provenance)
+discover sql.Name`...` tags (TS AST)
+  → describe against the dialect's engine (validity, result types, provenance)
   → resolve nullability (catalog + outer-join widening + overrides)
-  → emit <file>.gen.d.ts
+  → emit queries.gen.d.ts
 ```
 
-PGlite and TypeScript are runtime dependencies (the generator boots a DB and walks
-the TS AST). The CLI re-declares them so the published package installs them.
+The describe step runs against a dialect-specific introspector under `introspect/`,
+chosen by `dialect` (default `postgres`): **PGlite** for Postgres (`describeQuery`
+OIDs + `EXPLAIN VERBOSE` provenance) or **`bun:sqlite`** for SQLite (prepared-statement
+`declaredTypes`/`columnTypes` + a FROM/JOIN scan). Both satisfy one `Introspector`
+interface and resolve each field's TS type internally, so the nullability/emit stages
+stay engine-agnostic.
+
+TypeScript and PGlite are runtime dependencies (the generator walks the TS AST and
+boots a Postgres); the SQLite engine is `bun:sqlite`, built into Bun. The CLI
+re-declares them so the published package installs them.

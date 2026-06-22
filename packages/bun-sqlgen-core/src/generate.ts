@@ -3,9 +3,9 @@ import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createDiscoverer } from '#discover.ts';
 import { emitModule } from '#emit/index.ts';
-import { createIntrospector } from '#introspect.ts';
+import { createIntrospector } from '#introspect/index.ts';
 import { parseColumnComments, parseOverrides, resolveFields } from '#nullability.ts';
-import type { DiscoveredQuery, EmitModel, SqlgenConfig } from '#types.ts';
+import type { Dialect, DiscoveredQuery, EmitModel, SqlgenConfig } from '#types.ts';
 
 // Where the aggregated module lands when `--out` is omitted.
 const DEFAULT_OUT = 'src/queries.gen.d.ts';
@@ -33,6 +33,8 @@ export interface GenerateOptions {
   packageName?: string;
   /** Base directory for globs, migrations, and tsconfig lookup. Defaults to cwd. */
   cwd?: string;
+  /** Database engine to introspect against. Overrides config; defaults to `postgres`. */
+  dialect?: Dialect;
 }
 
 export interface GenerateFailure {
@@ -79,19 +81,22 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   }
   const sourceFiles = [...matched].filter((f) => f !== outPath && !isGenerated(f));
 
+  // Explicit `--dialect` wins over config; default Postgres. Extensions are a
+  // PGlite (Postgres) concept; a SQLite config carries none.
+  const dialect = options.dialect ?? config.dialect ?? 'postgres';
   const intro = await createIntrospector({
+    dialect,
     migrationsDir,
-    extensions: config.extensions,
     prelude: config.prelude,
     transformMigration: config.transformMigration,
+    extensions: config.dialect === 'sqlite' ? undefined : config.extensions,
   });
   const catalog = await intro.catalog();
   const columnOverrides = parseColumnComments(await intro.columnComments());
-  const types = await intro.types();
   const writable = await intro.writableColumns();
 
   // `writable` lets SET-clause neutralization self-assign a real column.
-  const discover = createDiscoverer({ projectRoot: cwd, files: sourceFiles, writable });
+  const discover = createDiscoverer({ projectRoot: cwd, files: sourceFiles, writable, dialect });
 
   const failures: GenerateFailure[] = [];
   let skipped = 0;
@@ -126,7 +131,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
         continue; // type what we can; report the rest in the summary
       }
       const overrides = parseOverrides(q.sql);
-      const resultFields = resolveFields({ described, catalog, overrides, columnOverrides, types });
+      const resultFields = resolveFields({ described, catalog, overrides, columnOverrides });
       emitModels.push({
         name: q.name,
         resultFields,

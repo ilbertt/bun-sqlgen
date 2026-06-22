@@ -1,4 +1,3 @@
-import { oidToTs } from '#oids.ts';
 import type {
   Catalog,
   ColumnOverride,
@@ -9,7 +8,6 @@ import type {
   Provenance,
   RawColumnComments,
   ResolvedField,
-  TypeCatalog,
 } from '#types.ts';
 
 /**
@@ -17,17 +15,16 @@ import type {
  * non-null iff it's NOT NULL *and* not on the nullable side of an outer join;
  * anything untraceable (expressions, aggregates, casts) is conservatively
  * nullable. Precedence: per-query `@notNull`/`@nullable` win, then the column's own
- * `COMMENT ON COLUMN` markers, then the catalog/OID defaults. A column's TS type and
- * its JSDoc both come from its comment (`@type` + prose).
+ * `COMMENT ON COLUMN` markers, then the catalog/introspector defaults. The base TS
+ * type comes from the introspector (`f.ts`); a column comment's `@type` overrides it.
  */
 export function resolveFields(input: {
   described: Pick<DescribeResult, 'fields' | 'provenance' | 'relations'>;
   catalog: Catalog;
   overrides: Overrides;
   columnOverrides: ColumnOverrides;
-  types: TypeCatalog;
 }): ResolvedField[] {
-  const { described, catalog, overrides, columnOverrides, types } = input;
+  const { described, catalog, overrides, columnOverrides } = input;
   // biome-ignore lint/complexity/useMaxParams: native map callback reads cleaner with the index
   return described.fields.map((f, i): ResolvedField => {
     const prov = described.provenance?.[i];
@@ -39,9 +36,10 @@ export function resolveFields(input: {
       ? columnOverrides[source.table]?.[source.column]
       : commentByName({ name: f.name, relations: described.relations, columnOverrides });
 
-    // Type: column-comment `@type` > OID mapping.
+    // Type: column-comment `@type` > the introspector's resolved type.
     const tsType = comment?.tsType;
-    const { ts, note } = tsType ? { ts: tsType, note: undefined } : oidToTs({ oid: f.oid, types });
+    const ts = tsType ?? f.ts;
+    const note = tsType ? undefined : f.tsNote;
 
     let nullable: boolean;
     let reason: NullabilityReason;

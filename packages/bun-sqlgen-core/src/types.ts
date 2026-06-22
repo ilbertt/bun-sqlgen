@@ -18,7 +18,10 @@ export type WritableColumns = Record<string, string[]>;
 
 export interface ResultField {
   name: string;
-  oid: number;
+  /** TS type for the column, already resolved by the dialect's introspector. */
+  ts: string;
+  /** Set when the type couldn't be mapped — emitted as a trailing comment on the field. */
+  tsNote?: string;
 }
 
 /**
@@ -37,10 +40,9 @@ export type Provenance =
   | { kind: 'expr'; expr: string };
 
 export interface DescribeResult {
-  params: number[];
   fields: ResultField[];
   provenance: Provenance[] | null;
-  /** Base tables in scope (from the plan), for matching comment overrides by name. */
+  /** Base tables in scope, for matching comment overrides and bare columns by name. */
   relations: string[];
 }
 
@@ -98,12 +100,51 @@ export interface EmitModel {
   neutralized: boolean;
 }
 
-/** `sqlgen.config.ts` — shapes the throwaway introspection DB to match production. */
-export interface SqlgenConfig {
+/** Which engine introspects the migrations at build time. Defaults to `postgres`. */
+export type Dialect = 'postgres' | 'sqlite';
+
+interface BaseConfig {
+  /** Database engine the queries run against. Defaults to `postgres`. */
+  dialect?: Dialect;
+  /** SQL run before migrations (stub functions/types/extensions). */
+  prelude?: string;
+  /** Rewrite or strip statements the throwaway DB can't run, per migration file. */
+  transformMigration?: (input: { sql: string; filename: string }) => string;
+}
+
+/** Postgres config: introspection runs against an in-process PGlite. */
+export interface PostgresConfig extends BaseConfig {
+  dialect?: 'postgres';
   /** PGlite extensions to load before applying migrations. */
   extensions?: () => Extensions | Promise<Extensions>;
-  /** SQL run before migrations (`CREATE EXTENSION`, stub functions/types). */
+}
+
+/** SQLite config: introspection runs against an in-memory `bun:sqlite` database. */
+export interface SqliteConfig extends BaseConfig {
+  dialect: 'sqlite';
+}
+
+/** `sqlgen.config.ts` — shapes the throwaway introspection DB to match production. */
+export type SqlgenConfig = PostgresConfig | SqliteConfig;
+
+/** In-process build-time DB with migrations applied — the dialect-agnostic seam. */
+export interface Introspector {
+  /** Resolve a query's result columns (name + TS type), provenance, and relations. */
+  describe: (sql: string) => Promise<DescribeResult>;
+  /** Per-column `NOT NULL`, for nullability resolution. */
+  catalog: () => Promise<Catalog>;
+  /** Per-column documentation/override comments (empty for engines without them). */
+  columnComments: () => Promise<RawColumnComments>;
+  /** Writable columns (not identity/generated), for SET-clause neutralization. */
+  writableColumns: () => Promise<WritableColumns>;
+  close: () => Promise<void>;
+}
+
+export interface IntrospectorOptions {
+  dialect: Dialect;
+  migrationsDir: string;
   prelude?: string;
-  /** Rewrite or strip statements PGlite can't run, per migration file. */
   transformMigration?: (input: { sql: string; filename: string }) => string;
+  /** Postgres only: PGlite extensions to load before migrations. */
+  extensions?: () => Extensions | Promise<Extensions>;
 }

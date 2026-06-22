@@ -1,10 +1,11 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { type Extensions, PGlite } from '@electric-sql/pglite';
-import { PG_OID } from '#oids.ts';
+import { PGlite } from '@electric-sql/pglite';
+import { applyMigrations } from '#introspect/migrations.ts';
+import { oidToTs, PG_OID } from '#oids.ts';
 import type {
   Catalog,
   DescribeResult,
+  Introspector,
+  IntrospectorOptions,
   Provenance,
   RawColumnComments,
   ResultField,
@@ -14,51 +15,35 @@ import type {
 } from '#types.ts';
 
 /** In-process Postgres (PGlite) with migrations applied — the build-time DB. */
-export interface Introspector {
-  describe: (sql: string) => Promise<DescribeResult>;
-  catalog: () => Promise<Catalog>;
-  columnComments: () => Promise<RawColumnComments>;
-  types: () => Promise<TypeCatalog>;
-  writableColumns: () => Promise<WritableColumns>;
-  close: () => Promise<void>;
-}
-
-export interface IntrospectorOptions {
-  migrationsDir: string;
-  extensions?: () => Extensions | Promise<Extensions>;
-  prelude?: string;
-  transformMigration?: (input: { sql: string; filename: string }) => string;
-}
-
-export async function createIntrospector(opts: IntrospectorOptions): Promise<Introspector> {
+export async function createPostgresIntrospector(opts: IntrospectorOptions): Promise<Introspector> {
   const extensions = opts.extensions ? await opts.extensions() : undefined;
   const db = new PGlite(extensions ? { extensions } : undefined);
 
   if (opts.prelude) {
     await db.exec(opts.prelude);
   }
+  await applyMigrations({
+    migrationsDir: opts.migrationsDir,
+    exec: (sql) => db.exec(sql).then(() => undefined),
+    transformMigration: opts.transformMigration,
+  });
 
-  // Apply migrations in filename order (exec runs multi-statement SQL).
-  const files = readdirSync(opts.migrationsDir)
-    .filter((f) => f.endsWith('.sql'))
-    .sort();
-  for (const filename of files) {
-    try {
-      let sql = readFileSync(join(opts.migrationsDir, filename), 'utf8');
-      if (opts.transformMigration) {
-        sql = opts.transformMigration({ sql, filename });
-      }
-      await db.exec(sql);
-    } catch (e) {
-      throw new Error(`migration ${filename} failed to apply: ${firstLine(e)}`);
-    }
+  // Dynamic OIDs (enum/domain/array) resolved once and reused across describes.
+  let typeCatalog: TypeCatalog | null = null;
+  async function getTypes(): Promise<TypeCatalog> {
+    typeCatalog ??= await loadTypes(db);
+    return typeCatalog;
   }
 
   async function describe(sql: string): Promise<DescribeResult> {
+    const types = await getTypes();
     // describeQuery throws the real Postgres error on bad SQL.
     const d = await db.describeQuery(sql);
     const params = d.queryParams.map((p) => p.dataTypeID);
-    const fields: ResultField[] = d.resultFields.map((f) => ({ name: f.name, oid: f.dataTypeID }));
+    const fields: ResultField[] = d.resultFields.map((field): ResultField => {
+      const { ts, note } = oidToTs({ oid: field.dataTypeID, types });
+      return { name: field.name, ts, tsNote: note };
+    });
 
     // EXPLAIN with a non-null dummy per param: NULL would short-circuit `col = NULL`
     // and let the planner prune the scans we read provenance from.
@@ -76,7 +61,7 @@ export async function createIntrospector(opts: IntrospectorOptions): Promise<Int
     } catch {
       provenance = null; // everything falls back to nullable
     }
-    return { params, fields, provenance, relations };
+    return { fields, provenance, relations };
   }
 
   // Per-column NOT NULL — the piece describeQuery can't give us.
@@ -131,43 +116,43 @@ export async function createIntrospector(opts: IntrospectorOptions): Promise<Int
     return map;
   }
 
-  // Dynamic OIDs (enum/domain/array) a static table can't know: read their
-  // labels/base/element from the catalog so the mapper can recurse to a leaf.
-  async function types(): Promise<TypeCatalog> {
-    const t = await db.query<PgTypeRow>(`
-      SELECT oid, typname, typtype, typbasetype, typelem, typcategory
-      FROM pg_type
-    `);
-    const e = await db.query<PgEnumRow>(`
-      SELECT enumtypid, enumlabel FROM pg_enum ORDER BY enumsortorder
-    `);
-    const labels = new Map<number, string[]>();
-    for (const row of e.rows) {
-      const oid = Number(row.enumtypid);
-      const existing = labels.get(oid) ?? [];
-      existing.push(row.enumlabel);
-      labels.set(oid, existing);
-    }
+  return { describe, catalog, columnComments, writableColumns, close: () => db.close() };
+}
 
-    const map: TypeCatalog = new Map();
-    for (const row of t.rows) {
-      const oid = Number(row.oid);
-      let info: TypeInfo;
-      if (row.typtype === 'e') {
-        info = { kind: 'enum', name: row.typname, labels: labels.get(oid) ?? [] };
-      } else if (row.typtype === 'd') {
-        info = { kind: 'domain', name: row.typname, baseOid: Number(row.typbasetype) };
-      } else if (row.typcategory === 'A' && Number(row.typelem) !== 0) {
-        info = { kind: 'array', name: row.typname, elemOid: Number(row.typelem) };
-      } else {
-        info = { kind: 'base', name: row.typname };
-      }
-      map.set(oid, info);
-    }
-    return map;
+// Dynamic OIDs (enum/domain/array) a static table can't know: read their
+// labels/base/element from the catalog so the mapper can recurse to a leaf.
+async function loadTypes(db: PGlite): Promise<TypeCatalog> {
+  const t = await db.query<PgTypeRow>(`
+    SELECT oid, typname, typtype, typbasetype, typelem, typcategory
+    FROM pg_type
+  `);
+  const e = await db.query<PgEnumRow>(`
+    SELECT enumtypid, enumlabel FROM pg_enum ORDER BY enumsortorder
+  `);
+  const labels = new Map<number, string[]>();
+  for (const row of e.rows) {
+    const oid = Number(row.enumtypid);
+    const existing = labels.get(oid) ?? [];
+    existing.push(row.enumlabel);
+    labels.set(oid, existing);
   }
 
-  return { describe, catalog, columnComments, types, writableColumns, close: () => db.close() };
+  const map: TypeCatalog = new Map();
+  for (const row of t.rows) {
+    const oid = Number(row.oid);
+    let info: TypeInfo;
+    if (row.typtype === 'e') {
+      info = { kind: 'enum', name: row.typname, labels: labels.get(oid) ?? [] };
+    } else if (row.typtype === 'd') {
+      info = { kind: 'domain', name: row.typname, baseOid: Number(row.typbasetype) };
+    } else if (row.typcategory === 'A' && Number(row.typelem) !== 0) {
+      info = { kind: 'array', name: row.typname, elemOid: Number(row.typelem) };
+    } else {
+      info = { kind: 'base', name: row.typname };
+    }
+    map.set(oid, info);
+  }
+  return map;
 }
 
 // ---- EXPLAIN plan typing ----------------------------------------------------
@@ -324,9 +309,4 @@ function analyzePlan(input: { plan: PlanNode; fieldCount: number }): {
     return { kind: 'expr', expr };
   });
   return { provenance, relations };
-}
-
-function firstLine(e: unknown): string {
-  const message = e instanceof Error ? e.message : String(e);
-  return message.split('\n')[0] ?? message;
 }

@@ -1,12 +1,19 @@
 import ts from 'typescript';
-import type { DiscoveredQuery, WritableColumns } from '#types.ts';
+import type { Dialect, DiscoveredQuery, WritableColumns } from '#types.ts';
+
+// Positional bind placeholder for the dialect: Postgres `$n`, SQLite `?n`. Both
+// number from 1 and match how Bun flattens params left-to-right at runtime.
+function placeholderFor(dialect: Dialect): (n: number) => string {
+  return dialect === 'sqlite' ? (n) => `?${n}` : (n) => `$${n}`;
+}
 
 /**
  * Finds Bun.sql tagged templates via the TS AST and turns each into static,
  * describable SQL. Composition is the hard part: a `${expr}` resolving to another
  * `sql\`...\`` fragment is inlined recursively; everything else becomes a
- * positional `$n`. One shared counter walks left-to-right, matching how Bun
- * flattens params at runtime. Tag detection is semantic — the checker confirms a
+ * positional placeholder (`$n` for Postgres, `?n` for SQLite). One shared counter
+ * walks left-to-right, matching how Bun flattens params at runtime. Tag detection
+ * is semantic — the checker confirms a
  * tag's type is Bun's `SQL` (or our `withTypes` wrapper, an intersection over it)
  * — so aliases/re-exports/`Bun.sql`/wrapped clients all resolve.
  *
@@ -34,8 +41,10 @@ export function createDiscoverer(input: {
   projectRoot: string;
   files: string[];
   writable?: WritableColumns;
+  dialect?: Dialect;
 }): Discoverer {
-  const { projectRoot, files, writable = {} } = input;
+  const { projectRoot, files, writable = {}, dialect = 'postgres' } = input;
+  const placeholder = placeholderFor(dialect);
   let options = COMPILER_OPTIONS;
   let rootFiles = files;
 
@@ -59,7 +68,7 @@ export function createDiscoverer(input: {
   const checker = program.getTypeChecker();
   return (file) => {
     const sf = program.getSourceFile(file);
-    return sf ? discover({ sf, checker, writable }) : [];
+    return sf ? discover({ sf, checker, writable, placeholder }) : [];
   };
 }
 
@@ -70,6 +79,7 @@ interface DiscoverCtx {
   isFragmentInit: (node: ts.Expression | undefined) => boolean;
   checker: ts.TypeChecker;
   writable: WritableColumns;
+  placeholder: (n: number) => string;
   neutralized?: boolean;
 }
 
@@ -77,8 +87,9 @@ function discover(input: {
   sf: ts.SourceFile;
   checker: ts.TypeChecker;
   writable: WritableColumns;
+  placeholder: (n: number) => string;
 }): DiscoveredQuery[] {
-  const { sf, checker, writable } = input;
+  const { sf, checker, writable, placeholder } = input;
   const isSql = (node: ts.Node): node is ts.TaggedTemplateExpression =>
     ts.isTaggedTemplateExpression(node) && isBunSqlType({ expr: node.tag, checker });
   const isFragmentInit = (node: ts.Expression | undefined): boolean => !!node && isSql(node);
@@ -119,6 +130,7 @@ function discover(input: {
       isFragmentInit,
       checker,
       writable,
+      placeholder,
     };
     const sql = expand({ tpl: node.template, ctx });
     out.push({
@@ -306,7 +318,7 @@ function resolveInterpolation(input: {
 
   // A runtime value -> bind parameter.
   ctx.paramCount += 1;
-  return `$${ctx.paramCount}`;
+  return ctx.placeholder(ctx.paramCount);
 }
 
 const KEYWORD_BOUNDARY = /\b(where|and|or|on|having|not)$/;
@@ -327,7 +339,7 @@ function neutralToken(input: { sqlSoFar: string; ctx: DiscoverCtx }): string {
   }
   if (IN_BOUNDARY.test(tail)) {
     ctx.paramCount += 1;
-    return `($${ctx.paramCount})`;
+    return `(${ctx.placeholder(ctx.paramCount)})`;
   }
   if (BY_BOUNDARY.test(tail)) {
     return '1';
