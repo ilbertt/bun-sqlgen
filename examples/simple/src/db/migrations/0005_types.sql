@@ -8,3 +8,8 @@ CREATE TABLE deal_meta (
   details  jsonb,
   scores   int4[]
 );
+
+-- The comment's prose becomes the generated field's JSDoc; the `@type` marker
+-- shapes the jsonb column everywhere it's selected (no per-query annotation).
+COMMENT ON COLUMN deal_meta.details IS
+  'Free-form metadata captured during the deal. @type { priority: number; notes: string }';

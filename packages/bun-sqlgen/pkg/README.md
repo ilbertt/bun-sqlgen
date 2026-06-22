@@ -161,39 +161,45 @@ SQL); an unnamed one falls back to `IUnnamedQueryNResult` as a nudge to name it.
 Nullability is a sound-leaning heuristic: base columns trace through the catalog
 and outer-join widening (a `NOT NULL` column pulled through a `LEFT JOIN` becomes
 nullable); expressions (functions, `CASE`, casts, aggregates) are conservatively
-nullable. Override per query with leading-comment pragmas — the sqlx `col!`/`col?`
-escape hatch:
+nullable. Override the nullability of a query's columns with leading-comment
+pragmas — the sqlx `col!`/`col?` escape hatch:
 
 ```sql
 /* @name report */
 /* @notNull total */
 /* @nullable note */
-/* @type details { priority: number; notes: string } */
-SELECT count(*) AS total, note, details FROM ...
+SELECT count(*) AS total, note FROM ...
 ```
 
 `/* @skip */` opts a query out of generation entirely (for SQL too dynamic to
-describe — e.g. `UPDATE ... SET ${dynamic}` — which you type by hand).
+describe — e.g. `UPDATE ... SET ${dynamic}`, or an expression whose shape you'd
+rather type by hand).
 
-### Schema-level overrides via column comments
+### Column types & docs via column comments
 
-When an override is a fact about the **column** rather than one query, declare it
-once in the schema with `COMMENT ON COLUMN` and the same `@notNull` / `@nullable`
-/ `@type` markers. It then applies to every query that selects that column —
-no per-query annotation:
+A column's TS type is a fact about the **column**, not a query, so it lives on a
+`COMMENT ON COLUMN` — never per query. The same comment carries `@notNull` /
+`@nullable`, and its **prose becomes the generated field's JSDoc**:
 
 ```sql
 -- a GENERATED column Postgres reports as nullable, but is always present:
 COMMENT ON COLUMN app.users.created_at IS 'Derived from the id. @notNull';
--- give a jsonb column a precise shape everywhere it is selected:
-COMMENT ON COLUMN app.users.prefs IS '@type { theme: "light" | "dark" }';
+-- shape a jsonb column everywhere it is selected, and document it:
+COMMENT ON COLUMN app.users.prefs IS 'User preferences. @type { theme: "light" | "dark" }';
 ```
 
-Precedence is **per-query pragma → column comment → catalog/OID default**. A
-column comment sets the column's *base* nullability, so outer-join widening still
-applies on top (a `@notNull` column pulled through a `LEFT JOIN` is still nullable
-in that query). Prose and markers can share a comment — only the `@…` tokens are
-read, so the comment stays useful as documentation.
+```ts
+export interface IGetUserResult {
+  /** User preferences. */
+  prefs: { theme: "light" | "dark" } | null;
+}
+```
+
+Precedence is **per-query `@notNull`/`@nullable` → column comment → catalog/OID
+default**. A column comment sets the column's *base* nullability, so outer-join
+widening still applies on top (a `@notNull` column pulled through a `LEFT JOIN` is
+still nullable in that query). Only the `@…` tokens are read for behavior; the
+rest of the comment is carried through as documentation.
 
 ## Boundaries
 

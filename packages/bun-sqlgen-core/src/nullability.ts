@@ -16,8 +16,9 @@ import type {
  * Resolve each result column's TS type and `| null`. A base-table column is
  * non-null iff it's NOT NULL *and* not on the nullable side of an outer join;
  * anything untraceable (expressions, aggregates, casts) is conservatively
- * nullable. Precedence: per-query `@notNull`/`@nullable`/`@type` win, then the
- * column's own `COMMENT ON COLUMN` markers, then the catalog/OID defaults.
+ * nullable. Precedence: per-query `@notNull`/`@nullable` win, then the column's own
+ * `COMMENT ON COLUMN` markers, then the catalog/OID defaults. A column's TS type and
+ * its JSDoc both come from its comment (`@type` + prose).
  */
 export function resolveFields(input: {
   described: Pick<DescribeResult, 'fields' | 'provenance' | 'relations'>;
@@ -38,8 +39,8 @@ export function resolveFields(input: {
       ? columnOverrides[source.table]?.[source.column]
       : commentByName({ name: f.name, relations: described.relations, columnOverrides });
 
-    // Type: per-query `@type` > column-comment `@type` > OID mapping.
-    const tsType = overrides.types.get(f.name) ?? comment?.tsType;
+    // Type: column-comment `@type` > OID mapping.
+    const tsType = comment?.tsType;
     const { ts, note } = tsType ? { ts: tsType, note: undefined } : oidToTs({ oid: f.oid, types });
 
     let nullable: boolean;
@@ -80,7 +81,7 @@ export function resolveFields(input: {
       reason = 'expr';
     }
 
-    return { name: f.name, ts, nullable, reason, note };
+    return { name: f.name, ts, nullable, reason, note, doc: comment?.doc };
   });
 }
 
@@ -116,14 +117,13 @@ function resolveSource(input: {
 
 const NOT_NULL_PRAGMA = /@notNull\s+([\w\s]+)/g;
 const NULLABLE_PRAGMA = /@nullable\s+([\w\s]+)/g;
-const TYPE_PRAGMA = /@type\s+(\w+)\s+([^\n*]+)/g;
 
-// `@type` captures the rest of its line, so it can hold spaces/generics:
-// `@type details { priority: number; notes: string }`.
+// Per-query overrides name the columns they apply to (`@notNull a b`). Typing a
+// column is a fact about the column, not a query — so `@type` lives only on a
+// `COMMENT ON COLUMN`, never here.
 export function parseOverrides(commentText = ''): Overrides {
   const notNull = new Set<string>();
   const nullable = new Set<string>();
-  const types = new Map<string, string>();
   for (const m of commentText.matchAll(NOT_NULL_PRAGMA)) {
     for (const c of m[1]!.trim().split(/\s+/)) {
       notNull.add(c);
@@ -134,33 +134,34 @@ export function parseOverrides(commentText = ''): Overrides {
       nullable.add(c);
     }
   }
-  for (const m of commentText.matchAll(TYPE_PRAGMA)) {
-    types.set(m[1]!, m[2]!.trim()); // stop before a closing `*/`
-  }
-  return { notNull, nullable, types };
+  return { notNull, nullable };
 }
 
 const COMMENT_TYPE_MARKER = /@type\s+([^\n]+)/;
+// Markers to strip when reducing a column comment to its prose (its JSDoc).
+const COMMENT_MARKERS = /@type\s+[^\n]*|@(?:notNull|nullable)\b/g;
 
-// Parse the schema-level markers out of a single column's `COMMENT ON COLUMN`
-// text. The column is implicit, so the markers are bare: `@notNull`, `@nullable`,
-// `@type <TsType>` — mixed freely with human-readable prose.
+// Parse a single column's `COMMENT ON COLUMN` text. The column is implicit, so the
+// markers are bare: `@notNull`, `@nullable`, `@type <TsType>` — mixed freely with
+// prose, which (markers removed) becomes the generated field's JSDoc.
 export function parseColumnComment(text: string): ColumnOverride {
   const typeMatch = COMMENT_TYPE_MARKER.exec(text);
+  const doc = text.replace(COMMENT_MARKERS, '').replace(/\s+/g, ' ').trim();
   return {
     notNull: /@notNull\b/.test(text),
     nullable: /@nullable\b/.test(text),
     tsType: typeMatch?.[1]?.trim(),
+    doc: doc || undefined,
   };
 }
 
-// Parse every column comment into its overrides, dropping comments with no markers.
+// Parse every column comment; keep any that carries a marker or documentation.
 export function parseColumnComments(raw: RawColumnComments): ColumnOverrides {
   const out: ColumnOverrides = {};
   for (const [table, columns] of Object.entries(raw)) {
     for (const [column, text] of Object.entries(columns)) {
       const override = parseColumnComment(text);
-      if (override.notNull || override.nullable || override.tsType) {
+      if (override.notNull || override.nullable || override.tsType || override.doc) {
         out[table] ??= {};
         out[table]![column] = override;
       }

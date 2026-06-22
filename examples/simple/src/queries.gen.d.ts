@@ -55,13 +55,18 @@ export interface IGetDealMetaResult {
     id: string;
     stage: "lead" | "negotiation" | "won" | "lost";
     tags: string[];
-    details: unknown | null;
+    /** Free-form metadata captured during the deal. */
+    details: {
+        priority: number;
+        notes: string;
+    } | null;
     scores: number[] | null;
 }
 
 /** Result of query `GetDealDetails`. */
 export interface IGetDealDetailsResult {
     id: string;
+    /** Free-form metadata captured during the deal. */
     details: {
         priority: number;
         notes: string;

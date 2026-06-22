@@ -5,6 +5,15 @@ import type { EmitModel, ResolvedField } from '#types.ts';
 function fieldSignature(field: ResolvedField): ts.PropertySignature {
   const type = typeNode(field.nullable ? `${field.ts} | null` : field.ts);
   const sig = f.createPropertySignature(undefined, propertyName(field.name), undefined, type);
+  // The source column's comment prose, ported as JSDoc.
+  if (field.doc) {
+    ts.addSyntheticLeadingComment(
+      sig,
+      ts.SyntaxKind.MultiLineCommentTrivia,
+      `* ${field.doc} `,
+      true,
+    );
+  }
   if (field.note) {
     ts.addSyntheticLeadingComment(
       sig,

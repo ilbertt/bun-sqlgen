@@ -346,7 +346,8 @@ function neutralToken(input: { sqlSoFar: string; ctx: DiscoverCtx }): string {
       return col;
     }
   }
-  // SELECT-list: keep the column as NULL so the row shape is preserved (pin it with `@type`).
+  // SELECT-list: keep the column as NULL so the row shape is preserved (`@skip` the
+  // query to hand-type it if the real column matters).
   if (SELECT_LIST_BOUNDARY.test(tail)) {
     return 'NULL';
   }

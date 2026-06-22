@@ -44,11 +44,10 @@ export interface DescribeResult {
   relations: string[];
 }
 
-/** Per-query escape hatches parsed from leading comments (`@notNull`/`@nullable`/`@type`). */
+/** Per-query escape hatches parsed from leading comments (`@notNull`/`@nullable`). */
 export interface Overrides {
   notNull: Set<string>;
   nullable: Set<string>;
-  types: Map<string, string>;
 }
 
 /** table -> column -> raw Postgres `COMMENT ON COLUMN` text. */
@@ -59,6 +58,8 @@ export interface ColumnOverride {
   notNull?: boolean;
   nullable?: boolean;
   tsType?: string;
+  /** The comment's prose (markers stripped), emitted as the field's JSDoc. */
+  doc?: string;
 }
 
 /** table -> column -> its parsed comment overrides. */
@@ -78,6 +79,8 @@ export interface ResolvedField {
   nullable: boolean;
   reason: NullabilityReason;
   note?: string;
+  /** The source column's comment prose, emitted as the field's JSDoc. */
+  doc?: string;
 }
 
 export interface DiscoveredQuery {

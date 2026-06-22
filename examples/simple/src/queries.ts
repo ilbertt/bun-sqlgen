@@ -87,10 +87,10 @@ export async function getDealMeta(dealId: number) {
   `;
 }
 
-// `@type` gives the json column a precise shape; nullability still applies on top.
+// `details` is typed (and documented) by its COMMENT ON COLUMN — no per-query
+// annotation, and the comment's prose lands on the field as JSDoc.
 export async function getDealDetails(dealId: number) {
   return await sql.GetDealDetails`
-    /* @type details { priority: number; notes: string } */
     SELECT id, details
     FROM deal_meta
     WHERE deal_id = ${dealId}
