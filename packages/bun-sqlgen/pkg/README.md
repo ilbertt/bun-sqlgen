@@ -134,17 +134,24 @@ introspection database so it matches production. It's a plain module whose
 default export is the config object:
 
 ```ts
-import { vector } from '@electric-sql/pglite/vector';
+import { citext } from '@electric-sql/pglite/contrib/citext';
 
 export default {
-  // PGlite extensions to load before applying migrations
-  extensions: () => ({ vector }),
-  // SQL run before migrations (CREATE EXTENSION, stub functions/types)
-  prelude: 'CREATE EXTENSION IF NOT EXISTS vector;',
-  // rewrite/strip statements PGlite can't run, per migration file
-  transformMigration: ({ sql }) => sql.replace(/CONCURRENTLY/g, ''),
+  // PGlite extensions to load so a migration's CREATE EXTENSION can succeed.
+  // Bundled contrib extensions live under '@electric-sql/pglite/contrib/*';
+  // others ship as their own package (e.g. pgvector as '@electric-sql/pglite-pgvector').
+  extensions: () => ({ citext }),
+  // SQL run before migrations — stub functions/types the app provides out-of-band.
+  prelude: `CREATE FUNCTION app_current_actor() RETURNS text
+    LANGUAGE sql IMMUTABLE AS $$ SELECT 'system'::text $$;`,
+  // rewrite/strip statements PGlite can't run, per migration file (CREATE INDEX
+  // CONCURRENTLY can't run inside the transaction a multi-statement file applies in).
+  transformMigration: ({ sql }) => sql.replace(/\bCONCURRENTLY\b/g, ''),
 };
 ```
+
+A runnable walkthrough of all three fields lives in the
+[`with-config` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/with-config).
 
 ## Naming
 

@@ -25,6 +25,16 @@
         "typescript": "catalog:",
       },
     },
+    "examples/with-config": {
+      "name": "@repo/example-with-config",
+      "devDependencies": {
+        "@electric-sql/pglite": "catalog:",
+        "@repo/bun-sqlgen": "workspace:*",
+        "@repo/typescript-config": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "packages/bun-sqlgen": {
       "name": "@repo/bun-sqlgen",
       "bin": {
@@ -143,6 +153,8 @@
     "@repo/bun-sqlgen-core": ["@repo/bun-sqlgen-core@workspace:packages/bun-sqlgen-core"],
 
     "@repo/example-simple": ["@repo/example-simple@workspace:examples/simple"],
+
+    "@repo/example-with-config": ["@repo/example-with-config@workspace:examples/with-config"],
 
     "@repo/pack-utils": ["@repo/pack-utils@workspace:packages/pack-utils"],
 
