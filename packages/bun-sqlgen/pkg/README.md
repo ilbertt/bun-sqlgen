@@ -3,8 +3,9 @@
 > sqlx-style typed SQL for `Bun.sql` — write raw SQL, get checked result types.
 
 Write raw SQL in `Bun.sql` tagged templates. A codegen step validates each query
-against a real (in-process) Postgres at build time and emits the result types, so
-plain `tsc` flags wrong property access, null-unsafety, and bad shapes.
+against a real in-process database (Postgres or [SQLite](#dialects-postgres-and-sqlite))
+at build time and emits the result types, so plain `tsc` flags wrong property
+access, null-unsafety, and bad shapes.
 
 Name a query by the **property** you tag it with — `sql.GetUser\`...\`` — and its
 row type is inferred at the call site, no manual generic:
@@ -123,7 +124,7 @@ await sql.begin(async (tx) => {
 ## CLI
 
 ```sh
-bunx bun-sqlgen generate <glob> --migrations <dir> [--out <file>] [--package <name>] [--config <file>] [--check]
+bunx bun-sqlgen generate <glob> --migrations <dir> [--out <file>] [--package <name>] [--config <file>] [--dialect <postgres|sqlite>] [--check]
 ```
 
 | argument | meaning |
@@ -133,6 +134,7 @@ bunx bun-sqlgen generate <glob> --migrations <dir> [--out <file>] [--package <na
 | `--out <file>` | output path for the generated module (default `src/queries.gen.d.ts`). |
 | `--package <name>` | package whose `QueryResults` registry to augment (default `@ilbertt/bun-sqlgen`) — the specifier you import `withTypes` from. |
 | `--config <file>` | explicit path to `sqlgen.config.{ts,js,mjs}`. |
+| `--dialect <postgres\|sqlite>` | database engine to introspect against (default `postgres`; overrides config — see [Dialects](#dialects-postgres-and-sqlite)). |
 | `--check` | fail (exit 1) if anything would change — the `sqlx prepare --check` analog for CI. |
 
 Paths resolve relative to the current directory. A suggested wiring in
@@ -149,6 +151,46 @@ Paths resolve relative to the current directory. A suggested wiring in
 
 Commit the generated `queries.gen.d.ts` and run `codegen:check` in CI so an edited
 query can never type-check against a stale shape.
+
+## Dialects: Postgres and SQLite
+
+bun-sqlgen defaults to Postgres but also supports **SQLite**. The query side is
+identical — Bun's `SQL` speaks SQLite through its `sqlite://` adapter, so you write
+the same `withTypes(new SQL(...))` client and `sql.Name\`...\`` tags:
+
+```ts
+const sql = withTypes(new SQL('sqlite://app.db')); // or 'sqlite://:memory:'
+```
+
+Select the engine with `--dialect sqlite` (or `dialect: 'sqlite'` in
+`sqlgen.config.ts`). Build-time introspection runs against an in-memory
+`bun:sqlite` database — built into Bun, nothing extra to install:
+
+```sh
+bun-sqlgen generate 'src/**/*.ts' --migrations migrations --dialect sqlite
+```
+
+Result types match what `Bun.SQL` returns at runtime: `INTEGER` / `REAL` /
+`NUMERIC` / `BOOLEAN` / `BIGINT` → `number`, `TEXT` → `string`, `BLOB` →
+`Uint8Array`, and `DATE` / `DATETIME` / `TIMESTAMP` → `string` (Bun returns the
+stored text, not a `Date`).
+
+**SQLite is a weaker introspection target than Postgres** — plan for these gaps:
+
+- **Nullability is more conservative.** Per-column `NOT NULL` still comes from the
+  schema, but SQLite exposes no column-origin metadata, so any query containing an
+  outer join marks **every** column nullable. Recover precision with per-query
+  `@notNull`.
+- **Expression columns** (function calls, arithmetic, most aggregates) typically
+  type as `unknown`: SQLite can't describe a result type without executing, and the
+  build-time database is empty. `count(*)` and similar integer aggregates are typed;
+  for the rest, set the type with a per-query `@type <col> <TsType>`.
+- **No column comments.** The schema-level overrides via `COMMENT ON COLUMN` are
+  Postgres-only; the per-query `@notNull`/`@nullable`/`@type` pragmas work in both
+  dialects.
+
+A runnable example lives in the
+[`sqlite` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/sqlite).
 
 ## Configuration
 
@@ -175,6 +217,8 @@ export default {
 
 A runnable walkthrough of all three fields lives in the
 [`with-config` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/with-config).
+`extensions` is Postgres-only; `prelude` and `transformMigration` apply to both
+dialects, and `dialect: 'sqlite'` selects SQLite (the `--dialect` flag overrides it).
 
 ## Naming
 

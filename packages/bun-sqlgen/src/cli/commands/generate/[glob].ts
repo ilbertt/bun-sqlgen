@@ -26,6 +26,10 @@ export const command = defineCommand('generate [glob]', {
       schema: z.string().optional(),
       description: 'Path to sqlgen.config.{ts,js,mjs} (auto-discovered otherwise).',
     },
+    dialect: {
+      schema: z.enum(['postgres', 'sqlite']).optional(),
+      description: 'Database engine to introspect against (default postgres; overrides config).',
+    },
     check: {
       schema: z.boolean().optional(),
       description: 'Fail if generated types would change — the CI freshness check.',
@@ -38,6 +42,7 @@ export const command = defineCommand('generate [glob]', {
       out: options.out,
       packageName: options.package,
       configPath: options.config,
+      dialect: options.dialect,
       check: options.check,
     });
     // generate() already reported details; throw only to set a non-zero exit (see main.ts).
