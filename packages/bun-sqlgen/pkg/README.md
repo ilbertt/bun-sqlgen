@@ -75,12 +75,12 @@ CLI at generation time — `withTypes` itself has no heavy dependencies.
    bunx bun-sqlgen generate 'src/**/*.ts' --migrations migrations
    ```
 
-   This writes `src/queries.gen.d.ts` — the result interfaces plus a `declare
-   module` block that augments the registry. No runtime; nothing to import (the
-   `.d.ts` is ambient, so the augmentation applies on its own):
+   This writes `src/queries.gen.d.ts` — a `declare module` block that augments the
+   registry, backed by one row interface per query. No runtime; nothing to import
+   (the `.d.ts` is ambient, so the augmentation applies on its own):
 
    ```ts
-   export interface IGetUserResult {
+   interface IGetUserResult {
      id: string; // int8 reads back as string under Bun.sql
      email: string;
      display_name: string | null;
@@ -88,14 +88,37 @@ CLI at generation time — `withTypes` itself has no heavy dependencies.
    declare module '@ilbertt/bun-sqlgen' {
      interface QueryResults { GetUser: IGetUserResult }
    }
+   export {};
    ```
 
 Now `user.emial` is a compile error and `user.display_name.length` is flagged as
 possibly-null — all by plain `tsc`.
 
 The untyped `sql\`...\`` escape hatch and real methods (`sql.begin`, …) keep
-working on the wrapped client. The result interfaces are exported too, so you can
-import `IGetUserResult` directly if you need to name the row type elsewhere.
+working on the wrapped client. To name a row type elsewhere, index the registry —
+`QueryResults['GetUser']` — instead of importing a generated interface; it's the
+single public access path and resolves no matter where the `.d.ts` lives:
+
+```ts
+import type { QueryResults } from '@ilbertt/bun-sqlgen';
+
+type User = QueryResults['GetUser']; // { id: string; email: string; display_name: string | null }
+```
+
+### Inside transactions
+
+The client passed to a `begin`/`transaction`/`savepoint` callback is typed too, so a
+named query works the same inside a transaction (and gets discovered by the codegen):
+
+```ts
+await sql.begin(async (tx) => {
+  const [order] = await tx.CreateOrder`INSERT INTO orders ... RETURNING id, total`;
+  await tx.savepoint(async (sp) => {
+    await sp.MarkPaid`UPDATE orders SET paid = true WHERE id = ${order!.id}`;
+  });
+  return order; // order.total is typed
+});
+```
 
 ## CLI
 
@@ -156,8 +179,8 @@ A runnable walkthrough of all three fields lives in the
 ## Naming
 
 A query's name is the **property you tag it with** — `sql.GetUser\`...\`` becomes
-`IGetUserResult` and the `GetUser` registry key. Names must be unique across the
-whole project (they share one registry).
+the `GetUser` registry key (reachable as `QueryResults['GetUser']`). Names must be
+unique across the whole project (they share one registry).
 
 ## Overrides
 
@@ -173,15 +196,42 @@ pragmas — the sqlx `col!`/`col?` escape hatch:
 SELECT count(*) AS total, note FROM ...
 ```
 
-`/* @skip */` opts a query out of generation entirely (for SQL too dynamic to
-describe — e.g. `UPDATE ... SET ${dynamic}`, or an expression whose shape you'd
-rather type by hand).
+For a column the generator genuinely can't type — an **expression** with no base
+column, like a `json_agg(...)` or a `paradedb.score(...)` — give its full TS type
+with `@type <col> <TsType>`. Everything after the column name to end-of-line is the
+type, verbatim (nullability included), so it wins over the catalog and the heuristic:
+
+```sql
+/* @type participants Array<{ id: string; name: string | null }> */
+/* @type score number | null */
+SELECT
+  json_agg(json_build_object('id', p.id, 'name', p.name)) AS participants,
+  paradedb.score(id) AS score,
+  ...
+```
+
+The type lands verbatim in the generated `.d.ts`, which has no imports — so keep it
+**self-contained**: use structural types and globals, or an inline `import('...')`
+(`@type prefs import('#db/tables').Prefs`) rather than a bare imported name.
+
+To opt a query out of generation entirely — SQL too dynamic to describe, or an
+expression whose shape you'd rather type by hand — **drop the `sql.Name` tag** and
+use the bare `sql\`...\`` escape hatch with your own row type:
+
+```ts
+const rows = await sql<MyRow[]>`SELECT ... ${dynamic} ...`;
+```
+
+A bare tag is never discovered, so there's nothing to skip: naming a query *is* the
+opt-in.
 
 ### Column types & docs via column comments
 
-A column's TS type is a fact about the **column**, not a query, so it lives on a
-`COMMENT ON COLUMN` — never per query. The same comment carries `@notNull` /
-`@nullable`, and its **prose becomes the generated field's JSDoc**:
+When a TS type is a fact about a **base column** (selected across many queries), it
+belongs on a `COMMENT ON COLUMN`, not repeated per query — that's the difference from
+the per-query `@type` above, which is for expression columns that have no base column
+to comment. The same comment carries `@notNull` / `@nullable`, and its **prose becomes
+the generated field's JSDoc**:
 
 ```sql
 -- a GENERATED column Postgres reports as nullable, but is always present:
@@ -191,7 +241,7 @@ COMMENT ON COLUMN app.users.prefs IS 'User preferences. @type { theme: "light" |
 ```
 
 ```ts
-export interface IGetUserResult {
+interface IGetUserResult {
   /** User preferences. */
   prefs: { theme: "light" | "dark" } | null;
 }
@@ -207,7 +257,7 @@ rest of the comment is carried through as documentation.
 
 - **Dynamic fragments** composed at runtime (`sql\`... ${sql(cols)} ...\``) can't
   be planned statically. The generator neutralizes what it can to keep the row
-  shape and notes when it does; verify those, or `@skip` them.
+  shape and notes when it does; verify those, or drop the name to hand-type them.
 - **PGlite vs real Postgres.** PGlite gives sub-second in-process regen. Its
   `describeQuery` doesn't expose `tableID`/`columnID`, so nullability comes from
   the catalog + `EXPLAIN` provenance rather than the wire protocol.
