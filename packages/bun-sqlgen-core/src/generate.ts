@@ -155,10 +155,10 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   // holds, but a dynamic SELECT column could be dropped/retyped. Flag them here at
   // generation time rather than commenting the generated file.
   if (neutralized.length) {
-    console.error(
+    console.log(
       `\nℹ ${neutralized.length} query(ies) had dynamic clauses neutralized — verify SELECT columns:`,
     );
-    console.error(`  ${neutralized.join(', ')}`);
+    console.log(`  ${neutralized.join(', ')}`);
   }
 
   const typed = emitModels.length;
