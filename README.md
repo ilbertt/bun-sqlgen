@@ -3,11 +3,11 @@
 > Type-safe SQL for Bun, no ORM — raw [`Bun.sql`](https://bun.sh/docs/runtime/sql),
 > live-checked against your schema.
 
-Tag a query with a name — `sql.GetUser\`...\`` — and its fully-typed, null-safe row
-appears right at the call site: no ORM, no generics, no hand-written types. Codegen
-plans every query against a real Postgres or SQLite database (no Docker needed), so wrong columns and
-bad SQL fail the build, not production — fast enough to rerun on every save. The
-runtime stays 100% Bun-native.
+Tag a query with a name — `` sql.GetUser`...` `` — and its fully-typed, null-safe
+row appears right at the call site: no ORM, no generics, no hand-written types.
+Codegen plans every query against a real Postgres or SQLite database (no Docker
+needed), so wrong columns and bad SQL fail the build, not production — fast enough
+to rerun on every save. The runtime stays 100% Bun-native.
 
 Published as **[`@ilbertt/bun-sqlgen`](https://www.npmjs.com/package/@ilbertt/bun-sqlgen)** —
 its [README](./packages/bun-sqlgen/pkg/README.md) is the full guide: both dialects,
