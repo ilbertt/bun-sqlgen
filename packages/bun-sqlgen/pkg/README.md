@@ -8,24 +8,9 @@ at build time and emits the result types, so plain `tsc` flags wrong property
 access, null-unsafety, and bad shapes.
 
 Name a query by the **property** you tag it with — `sql.GetUser\`...\`` — and its
-row type is inferred at the call site, no manual generic:
-
-```
-sql.GetUser`...`  ──▶  describe against PGlite  ──▶  emit queries.gen.d.ts
-  (your code)          (catches bad SQL here)        (augments the registry)
-       └──────────────── tsc infers the row type from `.GetUser` ───────────────┘
-```
-
-`withTypes` ships in this package; the generated file is pure types that augment
-its `QueryResults` registry (the [parsh](https://github.com/ilbertt/parsh) /
-TanStack-style `declare module` pattern). `tsc` never parses SQL — the generator
-hits the database, `tsc` just consumes the types it writes. Runtime stays 100%
-Bun-native: fragments, prepared-statement caching, and injection-safe binding are
-all preserved.
-
-> Why a property and not the query text? TypeScript widens tagged-template strings
-> to `string`, so it can't read anything out of the template at the type level — but
-> a property access it preserves exactly. The name lives where `tsc` can see it.
+row type is inferred right at the call site, no manual generic to write. Runtime
+stays 100% Bun-native: fragments, prepared-statement caching, and injection-safe
+binding all keep working.
 
 ## Installation
 
@@ -41,10 +26,11 @@ CLI at generation time — `withTypes` itself has no heavy dependencies.
 ## Quick start
 
 1. **Migrations are the source of truth for your schema** (this is where
-   `NOT NULL` lives). Put them in `migrations/*.sql`:
+   `NOT NULL` lives). Put them in any folder — you point the codegen at it with
+   `--migrations`:
 
    ```sql
-   -- migrations/0001_init.sql
+   -- db/migrations/0001_init.sql
    CREATE TABLE users (
      id           bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
      email        text NOT NULL,
@@ -73,32 +59,16 @@ CLI at generation time — `withTypes` itself has no heavy dependencies.
 3. **Generate** the types:
 
    ```sh
-   bunx bun-sqlgen generate 'src/**/*.ts' --migrations migrations
+   bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations
    ```
 
-   This writes `src/queries.gen.d.ts` — a `declare module` block that augments the
-   registry, backed by one row interface per query. No runtime; nothing to import
-   (the `.d.ts` is ambient, so the augmentation applies on its own):
+   This writes `src/queries.gen.d.ts` — commit it alongside your code. With it in
+   place, `user.emial` is a compile error and `user.display_name.length` is flagged
+   as possibly-null, all by plain `tsc`.
 
-   ```ts
-   interface IGetUserResult {
-     id: string; // int8 reads back as string under Bun.sql
-     email: string;
-     display_name: string | null;
-   }
-   declare module '@ilbertt/bun-sqlgen' {
-     interface QueryResults { GetUser: IGetUserResult }
-   }
-   export {};
-   ```
-
-Now `user.emial` is a compile error and `user.display_name.length` is flagged as
-possibly-null — all by plain `tsc`.
-
-The untyped `sql\`...\`` escape hatch and real methods (`sql.begin`, …) keep
-working on the wrapped client. To name a row type elsewhere, index the registry —
-`QueryResults['GetUser']` — instead of importing a generated interface; it's the
-single public access path and resolves no matter where the `.d.ts` lives:
+The wrapped client still exposes the untyped `sql\`...\`` escape hatch and every
+real method (`sql.begin`, …). To reuse a query's row type elsewhere, import
+`QueryResults` and read it by the query's name:
 
 ```ts
 import type { QueryResults } from '@ilbertt/bun-sqlgen';
@@ -124,41 +94,15 @@ await sql.begin(async (tx) => {
 ## CLI
 
 ```sh
-bunx bun-sqlgen generate <glob> --migrations <dir> [--out <file>] [--package <name>] [--config <file>] [--dialect <postgres|sqlite>] [--check | --check-queries | --check-stale]
+bun bun-sqlgen generate <glob> --migrations <dir> [options]
 ```
 
-| argument | meaning |
-|---|---|
-| `<glob>` | glob for your query source files, e.g. `'src/**/*.ts'` (quote it so the shell doesn't expand it). |
-| `--migrations <dir>` | **required** — your migrations directory. |
-| `--out <file>` | output path for the generated module (default `src/queries.gen.d.ts`). |
-| `--package <name>` | package whose `QueryResults` registry to augment (default `@ilbertt/bun-sqlgen`) — the specifier you import `withTypes` from. |
-| `--config <file>` | explicit path to `sqlgen.config.{ts,js,mjs}`. |
-| `--dialect <postgres\|sqlite>` | database engine to introspect against (default `postgres`; overrides config — see [Dialects](#dialects-postgres-and-sqlite)). |
-| `--check-queries` | fail (exit 1) if any discovered query doesn't plan against the schema. Writes nothing — a build-time SQL linter that needs no committed output. |
-| `--check-stale` | fail (exit 1) if the committed generated module is out of date. Writes nothing — the `sqlx prepare --check` freshness analog. |
-| `--check` | run **all** checks (queries + stale types); writes nothing. The one-flag CI default. |
-
-The `--check*` modes never write — wire them into CI or a pre-commit hook. They
-nest: `--check` ≡ `--check-queries --check-stale`. Use `--check-stale` (or `--check`)
-when you commit `queries.gen.d.ts` and consume the result types; reach for
-`--check-queries` alone when you only want the SQL validated and don't keep a
-generated file at all.
-
-Paths resolve relative to the current directory. A suggested wiring in
-`package.json`:
-
-```json
-{
-  "scripts": {
-    "codegen": "bun-sqlgen generate 'src/**/*.ts' --migrations migrations",
-    "codegen:check": "bun-sqlgen generate 'src/**/*.ts' --migrations migrations --check"
-  }
-}
-```
-
-Commit the generated `queries.gen.d.ts` and run `codegen:check` in CI so an edited
-query can never type-check against a stale shape.
+Run `bun bun-sqlgen generate --help` for the full, always-current option list. The
+essentials: `<glob>` is your query source files (quote it so the shell doesn't
+expand it), `--migrations` is required, and `--check` is the one-flag CI mode that
+validates every query and fails if the committed `queries.gen.d.ts` is stale —
+without writing anything. Commit the generated file and run `--check` in CI so an
+edited query can never type-check against a stale shape.
 
 ## Dialects: Postgres and SQLite
 
@@ -175,7 +119,7 @@ Select the engine with `--dialect sqlite` (or `dialect: 'sqlite'` in
 `bun:sqlite` database — built into Bun, nothing extra to install:
 
 ```sh
-bun-sqlgen generate 'src/**/*.ts' --migrations migrations --dialect sqlite
+bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations --dialect sqlite
 ```
 
 Result types match what `Bun.SQL` returns at runtime: `INTEGER` / `REAL` /
@@ -230,9 +174,9 @@ dialects, and `dialect: 'sqlite'` selects SQLite (the `--dialect` flag overrides
 
 ## Naming
 
-A query's name is the **property you tag it with** — `sql.GetUser\`...\`` becomes
-the `GetUser` registry key (reachable as `QueryResults['GetUser']`). Names must be
-unique across the whole project (they share one registry).
+A query's name is the **property you tag it with** — `sql.GetUser\`...\`` — and
+becomes its `QueryResults['GetUser']` type. Names must be unique across the whole
+project.
 
 ## Overrides
 
@@ -268,14 +212,8 @@ The type lands verbatim in the generated `.d.ts`, which has no imports — so ke
 
 To opt a query out of generation entirely — SQL too dynamic to describe, or an
 expression whose shape you'd rather type by hand — **drop the `sql.Name` tag** and
-use the bare `sql\`...\`` escape hatch with your own row type:
-
-```ts
-const rows = await sql<MyRow[]>`SELECT ... ${dynamic} ...`;
-```
-
-A bare tag is never discovered, so there's nothing to skip: naming a query *is* the
-opt-in.
+use the bare `sql\`...\`` escape hatch with your own row type. A bare tag is never
+discovered, so there's nothing to skip: naming a query *is* the opt-in.
 
 ### Column types & docs via column comments
 
@@ -315,7 +253,3 @@ rest of the comment is carried through as documentation.
   the catalog + `EXPLAIN` provenance rather than the wire protocol.
 - **Params aren't type-checked** by Bun's tag (its signature is `...values:
   unknown[]`). The generated result types cover the read side.
-
-## License
-
-[Unlicense](https://unlicense.org/)

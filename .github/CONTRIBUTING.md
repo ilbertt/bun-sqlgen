@@ -6,6 +6,7 @@
 git clone https://github.com/ilbertt/bun-sqlgen
 cd bun-sqlgen
 bun install
+bun run build
 ```
 
 ## Commit messages

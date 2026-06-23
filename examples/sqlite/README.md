@@ -1,24 +1,13 @@
 # sqlite
 
-A minimal **SQLite** example that uses
+A minimal **SQLite** example using
 [`@ilbertt/bun-sqlgen`](../../packages/bun-sqlgen/pkg/README.md) to generate typed
-result interfaces for `Bun.sql` queries. Same setup as the [`simple`](../simple)
-example, but introspected with `--dialect sqlite`.
-
-- `src/db/migrations/*.sql` — the SQLite schema (source of truth for `NOT NULL`).
-- `src/index.ts` — the queries, written as `sql.Name\`...\`` tags on a
-  `withTypes`-wrapped `new SQL('sqlite://:memory:')` client. The inline comments
-  call out SQLite-specific behavior: `BOOLEAN`/`BIGINT` → `number`, `DATETIME` →
-  `string`, the conservative outer-join nullability, and `@notNull` to recover it.
-- `src/queries.gen.d.ts` — generated; committed so `tsc` passes without a DB.
-
-## Scripts
-
-```sh
-bun run codegen        # regenerate queries.gen.d.ts (introspects via bun:sqlite)
-bun run codegen:check  # CI: fail if the generated types are stale
-bun run check:types    # tsc against the committed generated types
-```
+result interfaces. Same as the [`simple`](../simple) example, but the client is
+`new SQL('sqlite://:memory:')` and codegen introspects with `--dialect sqlite` (via
+`bun:sqlite`). The inline comments call out SQLite-specific behavior — `BOOLEAN` /
+`BIGINT` → `number`, `DATETIME` → `string`, and the conservative outer-join
+nullability that `@notNull` recovers. The generated `queries.gen.d.ts` is committed
+so `tsc` passes without a DB.
 
 ## What SQLite trades off vs Postgres
 
