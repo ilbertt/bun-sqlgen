@@ -19,11 +19,6 @@ caching, and injection-safe binding all run natively.
 bun add @ilbertt/bun-sqlgen
 ```
 
-Install it as a regular dependency: `withTypes` is imported at runtime, and the
-`bun-sqlgen` codegen bin lives in the same package. Requires Bun ≥ 1.3. PGlite
-(in-process WASM Postgres — no Docker) is pulled in too but is only loaded by the
-CLI at generation time — `withTypes` itself has no heavy dependencies.
-
 ## Quick start
 
 1. **Migrations are the source of truth for your schema** (this is where
