@@ -1,16 +1,16 @@
 # bun-sqlgen
 
-> sqlx-style typed SQL for `Bun.sql` — write raw SQL, get checked result types.
+> Type-safe SQL for Bun, no ORM — raw [`Bun.sql`](https://bun.sh/docs/runtime/sql),
+> live-checked against your schema.
 
-Write raw SQL in [`Bun.sql`](https://bun.sh/docs/runtime/sql) tagged templates. A
-codegen step validates each query against a real in-process database (Postgres or
-SQLite) at build time and emits the result types, so plain `tsc` flags wrong
-property access, null-unsafety, and bad shapes. Name a query by the property you tag
-it with — `sql.GetUser\`...\`` — and its row type is inferred right at the call site,
-no manual generic to write.
+Tag a query with a name — `sql.GetUser\`...\`` — and its fully-typed, null-safe row
+appears right at the call site: no ORM, no generics, no hand-written types. Codegen
+plans every query against a real Postgres or SQLite database (no Docker needed), so wrong columns and
+bad SQL fail the build, not production — fast enough to rerun on every save. The
+runtime stays 100% Bun-native.
 
-This repo publishes **[`@ilbertt/bun-sqlgen`](https://www.npmjs.com/package/@ilbertt/bun-sqlgen)**.
-Its [README](./packages/bun-sqlgen/pkg/README.md) is the full guide — both dialects,
+Published as **[`@ilbertt/bun-sqlgen`](https://www.npmjs.com/package/@ilbertt/bun-sqlgen)** —
+its [README](./packages/bun-sqlgen/pkg/README.md) is the full guide: both dialects,
 nullability overrides, transactions, and configuration.
 
 ## Install
@@ -18,8 +18,6 @@ nullability overrides, transactions, and configuration.
 ```sh
 bun add @ilbertt/bun-sqlgen
 ```
-
-Requires Bun ≥ 1.3.
 
 ## Quick start
 

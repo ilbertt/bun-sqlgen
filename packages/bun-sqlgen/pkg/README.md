@@ -4,13 +4,14 @@
 
 Write raw SQL in `Bun.sql` tagged templates. A codegen step validates each query
 against a real in-process database (Postgres or [SQLite](#dialects-postgres-and-sqlite))
-at build time and emits the result types, so plain `tsc` flags wrong property
-access, null-unsafety, and bad shapes.
+at build time — no Docker or running database needed — and emits the result types,
+so plain `tsc` flags wrong property access, null-unsafety, and bad shapes.
 
 Name a query by the **property** you tag it with — `sql.GetUser\`...\`` — and its
-row type is inferred right at the call site, no manual generic to write. Runtime
-stays 100% Bun-native: fragments, prepared-statement caching, and injection-safe
-binding all keep working.
+row type is inferred right at the call site, no manual generic to write. No runtime
+overhead: the generated types live in a `.d.ts` that `tsc` erases, and `withTypes`
+is a thin pass-through to Bun's native client — fragments, prepared-statement
+caching, and injection-safe binding all run natively.
 
 ## Installation
 
@@ -99,10 +100,20 @@ bun bun-sqlgen generate <glob> --migrations <dir> [options]
 
 Run `bun bun-sqlgen generate --help` for the full, always-current option list. The
 essentials: `<glob>` is your query source files (quote it so the shell doesn't
-expand it), `--migrations` is required, and `--check` is the one-flag CI mode that
-validates every query and fails if the committed `queries.gen.d.ts` is stale —
-without writing anything. Commit the generated file and run `--check` in CI so an
-edited query can never type-check against a stale shape.
+expand it) and `--migrations` is required. Three check modes write nothing and exit
+non-zero on a problem:
+
+- **`--check-queries`** — validate SQL only: plan every named query against the
+  schema and fail on any that don't (a missing column, a renamed table, a bad cast).
+  No types generated, no Docker, no running database — reach for it even if you only
+  want CI to guard that your raw SQL still matches the schema.
+- **`--check-stale`** — fail if the committed `queries.gen.d.ts` is out of date.
+- **`--check`** — run both; the one-flag CI default.
+
+Commit the generated file and run `--check` in CI so an edited query can never
+type-check against a stale shape. The
+[`check-only` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/check-only)
+shows the validate-only lane end to end.
 
 ## Dialects: Postgres and SQLite
 

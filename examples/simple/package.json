@@ -6,7 +6,7 @@
     "build": "bun codegen && bun build src/index.ts --outdir dist --target bun",
     "codegen": "bun-sqlgen generate 'src/**/*.ts' --migrations src/db/migrations --package @repo/bun-sqlgen",
     "codegen:check": "bun-sqlgen generate 'src/**/*.ts' --migrations src/db/migrations --package @repo/bun-sqlgen --check",
-    "check:types": "bun codegen && bun run --bun tsc"
+    "check:types": "bun codegen:check && bun run --bun tsc"
   },
   "devDependencies": {
     "@repo/bun-sqlgen": "workspace:*",
