@@ -7,7 +7,7 @@ against a real in-process database (Postgres or [SQLite](#dialects-postgres-and-
 at build time — no Docker or running database needed — and emits the result types,
 so plain `tsc` flags wrong property access, null-unsafety, and bad shapes.
 
-Name a query by the **property** you tag it with — `sql.GetUser\`...\`` — and its
+Name a query by the **property** you tag it with — `` sql.GetUser`...` `` — and its
 row type is inferred right at the call site, no manual generic to write. No runtime
 overhead: the generated types live in a `.d.ts` that `tsc` erases, and `withTypes`
 is a thin pass-through to Bun's native client — fragments, prepared-statement
@@ -62,7 +62,7 @@ bun add @ilbertt/bun-sqlgen
    place, `user.emial` is a compile error and `user.display_name.length` is flagged
    as possibly-null, all by plain `tsc`.
 
-The wrapped client still exposes the untyped `sql\`...\`` escape hatch and every
+The wrapped client still exposes the untyped `` sql`...` `` escape hatch and every
 real method (`sql.begin`, …). To reuse a query's row type elsewhere, import
 `QueryResults` and read it by the query's name:
 
@@ -114,7 +114,7 @@ shows the validate-only lane end to end.
 
 bun-sqlgen defaults to Postgres but also supports **SQLite**. The query side is
 identical — Bun's `SQL` speaks SQLite through its `sqlite://` adapter, so you write
-the same `withTypes(new SQL(...))` client and `sql.Name\`...\`` tags:
+the same `withTypes(new SQL(...))` client and `` sql.Name`...` `` tags:
 
 ```ts
 const sql = withTypes(new SQL('sqlite://app.db')); // or 'sqlite://:memory:'
@@ -180,7 +180,7 @@ dialects, and `dialect: 'sqlite'` selects SQLite (the `--dialect` flag overrides
 
 ## Naming
 
-A query's name is the **property you tag it with** — `sql.GetUser\`...\`` — and
+A query's name is the **property you tag it with** — `` sql.GetUser`...` `` — and
 becomes its `QueryResults['GetUser']` type. Names must be unique across the whole
 project.
 
@@ -218,7 +218,7 @@ The type lands verbatim in the generated `.d.ts`, which has no imports — so ke
 
 To opt a query out of generation entirely — SQL too dynamic to describe, or an
 expression whose shape you'd rather type by hand — **drop the `sql.Name` tag** and
-use the bare `sql\`...\`` escape hatch with your own row type. A bare tag is never
+use the bare `` sql`...` `` escape hatch with your own row type. A bare tag is never
 discovered, so there's nothing to skip: naming a query *is* the opt-in.
 
 ### Column types & docs via column comments
@@ -251,7 +251,7 @@ rest of the comment is carried through as documentation.
 
 ## Boundaries
 
-- **Dynamic fragments** composed at runtime (`sql\`... ${sql(cols)} ...\``) can't
+- **Dynamic fragments** composed at runtime (`` sql`... ${sql(cols)} ...` ``) can't
   be planned statically. The generator neutralizes what it can to keep the row
   shape and notes when it does; verify those, or drop the name to hand-type them.
 - **PGlite vs real Postgres.** PGlite gives sub-second in-process regen. Its
