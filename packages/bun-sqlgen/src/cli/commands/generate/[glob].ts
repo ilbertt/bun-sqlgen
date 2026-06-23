@@ -20,7 +20,8 @@ export const command = defineCommand('generate [glob]', {
     },
     package: {
       schema: z.string().optional(),
-      description: 'Package whose QueryResults registry to augment (default @ilbertt/bun-sqlgen).',
+      description:
+        'Package whose QueryResults registry to augment (default @ilbertt/bun-sqlgen). You can ignore this — it exists for this repo’s own examples.',
     },
     config: {
       schema: z.string().optional(),
