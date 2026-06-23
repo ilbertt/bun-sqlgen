@@ -1,7 +1,7 @@
 {
   "name": "@ilbertt/bun-sqlgen",
   "description": "Types generator for your Bun.sql queries",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "ilbertt",
   "repository": {
     "type": "git",
