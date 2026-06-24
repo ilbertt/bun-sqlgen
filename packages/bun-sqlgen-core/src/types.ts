@@ -104,32 +104,13 @@ export interface EmitModel {
   resultFields: ResolvedField[];
 }
 
+// The user-facing `sqlgen.config.ts` contract (`SqlgenConfig`, `defineConfig`) lives in
+// the published package's `@ilbertt/bun-sqlgen/config` submodule, not here — it must
+// compile to a declaration free of this private package. Core only consumes the
+// resolved introspection settings, modelled by `IntrospectorOptions` below.
+
 /** Which engine introspects the migrations at build time. Defaults to `postgres`. */
 export type Dialect = 'postgres' | 'sqlite';
-
-interface BaseConfig {
-  /** Database engine the queries run against. Defaults to `postgres`. */
-  dialect?: Dialect;
-  /** SQL run before migrations (stub functions/types/extensions). */
-  prelude?: string;
-  /** Rewrite or strip statements the throwaway DB can't run, per migration file. */
-  transformMigration?: (input: { sql: string; filename: string }) => string;
-}
-
-/** Postgres config: introspection runs against an in-process PGlite. */
-export interface PostgresConfig extends BaseConfig {
-  dialect?: 'postgres';
-  /** PGlite extensions to load before applying migrations. */
-  extensions?: () => Extensions | Promise<Extensions>;
-}
-
-/** SQLite config: introspection runs against an in-memory `bun:sqlite` database. */
-export interface SqliteConfig extends BaseConfig {
-  dialect: 'sqlite';
-}
-
-/** `sqlgen.config.ts` — shapes the throwaway introspection DB to match production. */
-export type SqlgenConfig = PostgresConfig | SqliteConfig;
 
 /** In-process build-time DB with migrations applied — the dialect-agnostic seam. */
 export interface Introspector {

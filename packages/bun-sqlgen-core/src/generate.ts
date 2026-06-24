@@ -5,7 +5,13 @@ import { createDiscoverer } from '#discover.ts';
 import { emitModule } from '#emit/index.ts';
 import { createIntrospector } from '#introspect/index.ts';
 import { parseColumnComments, parseOverrides, resolveFields } from '#nullability.ts';
-import type { Dialect, DiscoveredQuery, EmitModel, SqlgenConfig } from '#types.ts';
+import type { Dialect, DiscoveredQuery, EmitModel, IntrospectorOptions } from '#types.ts';
+
+// What a `sqlgen.config.*` may set: every introspection input except the migrations
+// dir (a CLI arg). Derived from IntrospectorOptions so it can't drift from what the
+// introspector actually consumes; the user-facing `SqlgenConfig` (a structurally
+// compatible shape) is the published `@ilbertt/bun-sqlgen/config` submodule.
+type LoadedConfig = Partial<Omit<IntrospectorOptions, 'migrationsDir'>>;
 
 // Where the aggregated module lands when `--out` is omitted.
 const DEFAULT_OUT = 'src/queries.gen.d.ts';
@@ -218,7 +224,7 @@ function requireUniqueNames(discovered: Array<{ q: DiscoveredQuery; file: string
 }
 
 // Load `sqlgen.config.{ts,js,mjs}` from the root (or an explicit path); {} when absent.
-async function loadConfig(input: { root: string; explicit?: string }): Promise<SqlgenConfig> {
+async function loadConfig(input: { root: string; explicit?: string }): Promise<LoadedConfig> {
   const path = input.explicit
     ? resolve(input.explicit)
     : ['sqlgen.config.ts', 'sqlgen.config.js', 'sqlgen.config.mjs']
@@ -228,8 +234,8 @@ async function loadConfig(input: { root: string; explicit?: string }): Promise<S
     return {};
   }
   const mod = (await import(pathToFileURL(path).href)) as {
-    default?: SqlgenConfig;
-  } & SqlgenConfig;
+    default?: LoadedConfig;
+  } & LoadedConfig;
   return mod.default ?? mod;
 }
 

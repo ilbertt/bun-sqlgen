@@ -3,6 +3,6 @@
   "compilerOptions": {
     "rootDir": "."
   },
-  "include": ["src"],
+  "include": ["src", "sqlgen.config.ts"],
   "exclude": ["node_modules", "dist"]
 }
