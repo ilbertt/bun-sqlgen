@@ -1,9 +1,5 @@
 import type { Extensions } from '@electric-sql/pglite';
 
-// Defined here, not re-exported from `@repo/bun-sqlgen-core`: importing only the
-// published `@electric-sql/pglite` keeps the emitted `.d.ts` from leaking that
-// private package.
-
 /** Which engine introspects the migrations at build time. Defaults to `postgres`. */
 export type Dialect = 'postgres' | 'sqlite';
 
