@@ -153,13 +153,15 @@ A runnable example lives in the
 ## Configuration
 
 An optional `sqlgen.config.ts` in the current directory shapes the throwaway
-introspection database so it matches production. It's a plain module whose
-default export is the config object:
+introspection database so it matches production. Wrap the default export in
+`defineConfig` from the `/config` submodule to get type-checking and inferred
+callback parameters (it's an identity function — a no-op at runtime, like Vite's):
 
 ```ts
 import { citext } from '@electric-sql/pglite/contrib/citext';
+import { defineConfig } from '@ilbertt/bun-sqlgen/config';
 
-export default {
+export default defineConfig({
   // PGlite extensions to load so a migration's CREATE EXTENSION can succeed.
   // Bundled contrib extensions live under '@electric-sql/pglite/contrib/*';
   // others ship as their own package (e.g. pgvector as '@electric-sql/pglite-pgvector').
@@ -170,8 +172,11 @@ export default {
   // rewrite/strip statements PGlite can't run, per migration file (CREATE INDEX
   // CONCURRENTLY can't run inside the transaction a multi-statement file applies in).
   transformMigration: ({ sql }) => sql.replace(/\bCONCURRENTLY\b/g, ''),
-};
+});
 ```
+
+`defineConfig` is optional — a plain `export default { … }` still works, but you
+lose the type-checking and autocompletion.
 
 A runnable walkthrough of all three fields lives in the
 [`with-config` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/with-config).

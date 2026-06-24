@@ -5,7 +5,9 @@ import { createDiscoverer } from '#discover.ts';
 import { emitModule } from '#emit/index.ts';
 import { createIntrospector } from '#introspect/index.ts';
 import { parseColumnComments, parseOverrides, resolveFields } from '#nullability.ts';
-import type { Dialect, DiscoveredQuery, EmitModel, SqlgenConfig } from '#types.ts';
+import type { Dialect, DiscoveredQuery, EmitModel, IntrospectorOptions } from '#types.ts';
+
+type LoadedConfig = Partial<Omit<IntrospectorOptions, 'migrationsDir'>>;
 
 // Where the aggregated module lands when `--out` is omitted.
 const DEFAULT_OUT = 'src/queries.gen.d.ts';
@@ -218,7 +220,7 @@ function requireUniqueNames(discovered: Array<{ q: DiscoveredQuery; file: string
 }
 
 // Load `sqlgen.config.{ts,js,mjs}` from the root (or an explicit path); {} when absent.
-async function loadConfig(input: { root: string; explicit?: string }): Promise<SqlgenConfig> {
+async function loadConfig(input: { root: string; explicit?: string }): Promise<LoadedConfig> {
   const path = input.explicit
     ? resolve(input.explicit)
     : ['sqlgen.config.ts', 'sqlgen.config.js', 'sqlgen.config.mjs']
@@ -228,8 +230,8 @@ async function loadConfig(input: { root: string; explicit?: string }): Promise<S
     return {};
   }
   const mod = (await import(pathToFileURL(path).href)) as {
-    default?: SqlgenConfig;
-  } & SqlgenConfig;
+    default?: LoadedConfig;
+  } & LoadedConfig;
   return mod.default ?? mod;
 }
 

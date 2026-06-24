@@ -107,30 +107,6 @@ export interface EmitModel {
 /** Which engine introspects the migrations at build time. Defaults to `postgres`. */
 export type Dialect = 'postgres' | 'sqlite';
 
-interface BaseConfig {
-  /** Database engine the queries run against. Defaults to `postgres`. */
-  dialect?: Dialect;
-  /** SQL run before migrations (stub functions/types/extensions). */
-  prelude?: string;
-  /** Rewrite or strip statements the throwaway DB can't run, per migration file. */
-  transformMigration?: (input: { sql: string; filename: string }) => string;
-}
-
-/** Postgres config: introspection runs against an in-process PGlite. */
-export interface PostgresConfig extends BaseConfig {
-  dialect?: 'postgres';
-  /** PGlite extensions to load before applying migrations. */
-  extensions?: () => Extensions | Promise<Extensions>;
-}
-
-/** SQLite config: introspection runs against an in-memory `bun:sqlite` database. */
-export interface SqliteConfig extends BaseConfig {
-  dialect: 'sqlite';
-}
-
-/** `sqlgen.config.ts` — shapes the throwaway introspection DB to match production. */
-export type SqlgenConfig = PostgresConfig | SqliteConfig;
-
 /** In-process build-time DB with migrations applied — the dialect-agnostic seam. */
 export interface Introspector {
   /** Resolve a query's result columns (name + TS type), provenance, and relations. */
