@@ -59,7 +59,7 @@ bun add @ilbertt/bun-sqlgen
    ```
 
    This writes `src/queries.gen.d.ts` — commit it alongside your code. With it in
-   place, `user.emial` is a compile error and `user.display_name.length` is flagged
+   place, `user.whatever` is a compile error and `user.display_name.length` is flagged
    as possibly-null, all by plain `tsc`.
 
 The wrapped client still exposes the untyped `` sql`...` `` escape hatch and every

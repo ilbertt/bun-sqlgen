@@ -1,18 +1,10 @@
 # bun-sqlgen
 
-> Typed results for raw [`Bun.sql`](https://bun.sh/docs/runtime/sql) queries, checked
-> against your real schema at build time.
+> Types generator for your [`Bun.sql`](https://bun.sh/docs/runtime/sql) queries
 
-You write SQL in `Bun.sql` tagged templates, each tagged with a name. A codegen step
-builds your schema in-process from your migrations — real Postgres via
-[PGlite](https://pglite.dev/) or SQLite, no Docker and no running server — plans every
-query against it, and emits the result types as a `.d.ts`. A query that drifts from the
-schema (a missing column, a bad cast) fails codegen; a mismatched field or null-unsafe
-access fails `tsc`.
-
-No ORM and no hand-written row types. `withTypes` is a pass-through over Bun's native
-client, so binding, fragments, and prepared-statement caching all stay native, and the
-generated `.d.ts` adds nothing at runtime.
+You don't need an ORM to have type-safe SQL statements in your Bun application.
+[`@ilbertt/bun-sqlgen`](https://www.npmjs.com/package/@ilbertt/bun-sqlgen) is a codegen tool that validates your queries against your schema and generates their result types.
+No running database is needed at codegen time, because your migrations run against an in-memory Wasm Postgres ([PGlite](https://pglite.dev/)).
 
 ## Install
 
@@ -55,24 +47,9 @@ bun add @ilbertt/bun-sqlgen
    bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations
    ```
 
-   This writes `src/queries.gen.d.ts` — commit it. With it in place, `user.emial` is
+   This writes `src/queries.gen.d.ts` — commit it. With it in place, `user.whatever` is
    a compile error and `user.display_name.length` is flagged as possibly-null, all by
    plain `tsc`.
-
-## More
-
-The published package is
-**[`@ilbertt/bun-sqlgen`](https://www.npmjs.com/package/@ilbertt/bun-sqlgen)**; its
-[README](./packages/bun-sqlgen/pkg/README.md) is the full guide:
-
-- **Postgres and SQLite** — the same query API; `--dialect` picks the engine.
-- **CI without codegen** — `--check` fails the build on a query that drifted from the
-  schema, or on a stale generated file.
-- **Nullability inference with escape hatches** — outer joins widen columns to
-  nullable; `@notNull` / `@nullable` / `@type` pragmas override it per query or via
-  column comments.
-- **Typed inside transactions** — the client passed to `begin` / `savepoint` is typed
-  and discovered by codegen too.
 
 ## Examples
 

@@ -11,5 +11,5 @@ workspace name the example imports from (real projects use the default
 `@ilbertt/bun-sqlgen`).
 
 Editing a query and running `codegen` is all it takes; misusing a result type
-(`row.emial`, `row.display_name.length` on a nullable column) becomes a `tsc`
+(`row.whatever`, `row.display_name.length` on a nullable column) becomes a `tsc`
 error, and a query with invalid SQL fails `codegen` with the real Postgres message.
