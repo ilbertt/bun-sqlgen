@@ -1,17 +1,10 @@
 # @ilbertt/bun-sqlgen
 
-> sqlx-style typed SQL for `Bun.sql` — write raw SQL, get checked result types.
+> Types generator for your [`Bun.sql`](https://bun.sh/docs/runtime/sql) queries
 
-Write raw SQL in `Bun.sql` tagged templates. A codegen step validates each query
-against a real in-process database (Postgres or [SQLite](#dialects-postgres-and-sqlite))
-at build time — no Docker or running database needed — and emits the result types,
-so plain `tsc` flags wrong property access, null-unsafety, and bad shapes.
-
-Name a query by the **property** you tag it with — `` sql.GetUser`...` `` — and its
-row type is inferred right at the call site, no manual generic to write. No runtime
-overhead: the generated types live in a `.d.ts` that `tsc` erases, and `withTypes`
-is a thin pass-through to Bun's native client — fragments, prepared-statement
-caching, and injection-safe binding all run natively.
+You don't need an ORM to have type-safe SQL statements in your Bun application.
+`@ilbertt/bun-sqlgen` is a codegen tool that validates your queries against your schema and generates their result types.
+No running database is needed at codegen time, because your migrations run against an in-memory Wasm Postgres ([PGlite](https://pglite.dev/)).
 
 ## Installation
 
