@@ -7,8 +7,6 @@ import { createIntrospector } from '#introspect/index.ts';
 import { parseColumnComments, parseOverrides, resolveFields } from '#nullability.ts';
 import type { Dialect, DiscoveredQuery, EmitModel, IntrospectorOptions } from '#types.ts';
 
-// Derived from IntrospectorOptions (minus migrationsDir, a CLI arg) so it can't drift
-// from what the introspector consumes.
 type LoadedConfig = Partial<Omit<IntrospectorOptions, 'migrationsDir'>>;
 
 // Where the aggregated module lands when `--out` is omitted.
