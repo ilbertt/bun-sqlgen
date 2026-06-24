@@ -1,12 +1,8 @@
 import type { Extensions } from '@electric-sql/pglite';
 
-// The public `@ilbertt/bun-sqlgen/config` submodule. The config contract is defined
-// here — rather than re-exported from `@repo/bun-sqlgen-core` — on purpose: the only
-// import is the published `@electric-sql/pglite`, so this file compiles to a fully
-// self-contained declaration as part of the normal lib build (no separate step), and
-// the shipped `.d.ts` never leaks the private core package. The shape mirrors the
-// introspection settings core consumes (`IntrospectorOptions`), kept compatible by
-// the structural cast in core's config loader.
+// Defined here, not re-exported from `@repo/bun-sqlgen-core`: importing only the
+// published `@electric-sql/pglite` keeps the emitted `.d.ts` from leaking that
+// private package.
 
 /** Which engine introspects the migrations at build time. Defaults to `postgres`. */
 export type Dialect = 'postgres' | 'sqlite';

@@ -7,10 +7,8 @@ import { createIntrospector } from '#introspect/index.ts';
 import { parseColumnComments, parseOverrides, resolveFields } from '#nullability.ts';
 import type { Dialect, DiscoveredQuery, EmitModel, IntrospectorOptions } from '#types.ts';
 
-// What a `sqlgen.config.*` may set: every introspection input except the migrations
-// dir (a CLI arg). Derived from IntrospectorOptions so it can't drift from what the
-// introspector actually consumes; the user-facing `SqlgenConfig` (a structurally
-// compatible shape) is the published `@ilbertt/bun-sqlgen/config` submodule.
+// Derived from IntrospectorOptions (minus migrationsDir, a CLI arg) so it can't drift
+// from what the introspector consumes.
 type LoadedConfig = Partial<Omit<IntrospectorOptions, 'migrationsDir'>>;
 
 // Where the aggregated module lands when `--out` is omitted.

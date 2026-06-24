@@ -104,11 +104,6 @@ export interface EmitModel {
   resultFields: ResolvedField[];
 }
 
-// The user-facing `sqlgen.config.ts` contract (`SqlgenConfig`, `defineConfig`) lives in
-// the published package's `@ilbertt/bun-sqlgen/config` submodule, not here — it must
-// compile to a declaration free of this private package. Core only consumes the
-// resolved introspection settings, modelled by `IntrospectorOptions` below.
-
 /** Which engine introspects the migrations at build time. Defaults to `postgres`. */
 export type Dialect = 'postgres' | 'sqlite';
 

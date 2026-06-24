@@ -1,17 +1,17 @@
 # bun-sqlgen
 
-> Type-safe SQL for Bun, no ORM — raw [`Bun.sql`](https://bun.sh/docs/runtime/sql),
-> live-checked against your schema.
+> Typed results for raw `Bun.sql` queries, checked against your real schema at build time.
 
-Tag a query with a name — `` sql.GetUser`...` `` — and its fully-typed, null-safe
-row appears right at the call site: no ORM, no generics, no hand-written types.
-Codegen plans every query against a real Postgres or SQLite database (no Docker
-needed), so wrong columns and bad SQL fail the build, not production — fast enough
-to rerun on every save. The runtime stays 100% Bun-native.
+You write SQL in [`Bun.sql`](https://bun.sh/docs/runtime/sql) tagged templates, each
+tagged with a name. A codegen step builds your schema in-process from your migrations
+— real Postgres via [PGlite](https://pglite.dev/) or SQLite, no Docker and no running
+server — plans every query against it, and emits the result types as a `.d.ts`. A
+query that drifts from the schema (a missing column, a bad cast) fails codegen; a
+mismatched field or null-unsafe access fails `tsc`.
 
-Published as **[`@ilbertt/bun-sqlgen`](https://www.npmjs.com/package/@ilbertt/bun-sqlgen)** —
-its [README](./packages/bun-sqlgen/pkg/README.md) is the full guide: both dialects,
-nullability overrides, transactions, and configuration.
+No ORM and no hand-written row types. `withTypes` is a pass-through over Bun's native
+client, so binding, fragments, and prepared-statement caching all stay native, and the
+generated `.d.ts` adds nothing at runtime.
 
 ## Install
 
@@ -21,7 +21,7 @@ bun add @ilbertt/bun-sqlgen
 
 ## Quick start
 
-1. Migrations are the source of truth for your schema — put them in any folder:
+1. Your migrations are the source of truth for the schema — put them in any folder:
 
    ```sql
    -- db/migrations/0001_init.sql
@@ -44,7 +44,7 @@ bun add @ilbertt/bun-sqlgen
      const [user] = await sql.GetUser`
        SELECT id, email, display_name FROM users WHERE id = ${id}
      `;
-     return user; // typed { id: string; email: string; display_name: string | null }
+     return user; // { id: string; email: string; display_name: string | null }
    }
    ```
 
@@ -57,6 +57,21 @@ bun add @ilbertt/bun-sqlgen
    This writes `src/queries.gen.d.ts` — commit it. With it in place, `user.emial` is
    a compile error and `user.display_name.length` is flagged as possibly-null, all by
    plain `tsc`.
+
+## More
+
+The published package is
+**[`@ilbertt/bun-sqlgen`](https://www.npmjs.com/package/@ilbertt/bun-sqlgen)**; its
+[README](./packages/bun-sqlgen/pkg/README.md) is the full guide:
+
+- **Postgres and SQLite** — the same query API; `--dialect` picks the engine.
+- **CI without codegen** — `--check` fails the build on a query that drifted from the
+  schema, or on a stale generated file.
+- **Nullability inference with escape hatches** — outer joins widen columns to
+  nullable; `@notNull` / `@nullable` / `@type` pragmas override it per query or via
+  column comments.
+- **Typed inside transactions** — the client passed to `begin` / `savepoint` is typed
+  and discovered by codegen too.
 
 ## Examples
 
