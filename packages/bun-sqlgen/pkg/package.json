@@ -22,6 +22,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "bun": "./dist/index.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "bun": "./dist/config.js"
     }
   },
   "files": [
