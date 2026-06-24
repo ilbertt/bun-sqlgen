@@ -1,17 +1,10 @@
 # bun-sqlgen
 
-> Type-safe SQL for Bun, no ORM — raw [`Bun.sql`](https://bun.sh/docs/runtime/sql),
-> live-checked against your schema.
+> Types generator for your [`Bun.sql`](https://bun.sh/docs/runtime/sql) queries
 
-Tag a query with a name — `` sql.GetUser`...` `` — and its fully-typed, null-safe
-row appears right at the call site: no ORM, no generics, no hand-written types.
-Codegen plans every query against a real Postgres or SQLite database (no Docker
-needed), so wrong columns and bad SQL fail the build, not production — fast enough
-to rerun on every save. The runtime stays 100% Bun-native.
-
-Published as **[`@ilbertt/bun-sqlgen`](https://www.npmjs.com/package/@ilbertt/bun-sqlgen)** —
-its [README](./packages/bun-sqlgen/pkg/README.md) is the full guide: both dialects,
-nullability overrides, transactions, and configuration.
+You don't need an ORM to have type-safe SQL statements in your Bun application.
+[`@ilbertt/bun-sqlgen`](https://www.npmjs.com/package/@ilbertt/bun-sqlgen) is a codegen tool that validates your queries against your schema and generates their result types.
+No running database is needed at codegen time, because your migrations run against an in-memory Wasm Postgres ([PGlite](https://pglite.dev/)).
 
 ## Install
 
@@ -21,7 +14,7 @@ bun add @ilbertt/bun-sqlgen
 
 ## Quick start
 
-1. Migrations are the source of truth for your schema — put them in any folder:
+1. Your migrations are the source of truth for the schema — put them in any folder:
 
    ```sql
    -- db/migrations/0001_init.sql
@@ -44,7 +37,7 @@ bun add @ilbertt/bun-sqlgen
      const [user] = await sql.GetUser`
        SELECT id, email, display_name FROM users WHERE id = ${id}
      `;
-     return user; // typed { id: string; email: string; display_name: string | null }
+     return user; // { id: string; email: string; display_name: string | null }
    }
    ```
 
@@ -54,7 +47,7 @@ bun add @ilbertt/bun-sqlgen
    bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations
    ```
 
-   This writes `src/queries.gen.d.ts` — commit it. With it in place, `user.emial` is
+   This writes `src/queries.gen.d.ts` — commit it. With it in place, `user.whatever` is
    a compile error and `user.display_name.length` is flagged as possibly-null, all by
    plain `tsc`.
 

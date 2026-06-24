@@ -17,8 +17,8 @@ console.log(userDeals[0]?.updated_at.toISOString()); // updated_at: Date
 const amount: string = userDeals[0]!.amount;
 console.log(amount);
 
-// @ts-expect-error — `emial` isn't a column on the result
-console.log(userDeals[0]?.emial);
+// @ts-expect-error — `whatever` isn't a column on the result
+console.log(userDeals[0]?.whatever);
 
 // Single table, all columns NOT NULL → no `| null`.
 const deals = await sql.ListDeals`
