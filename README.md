@@ -1,13 +1,14 @@
 # bun-sqlgen
 
-> Typed results for raw `Bun.sql` queries, checked against your real schema at build time.
+> Typed results for raw [`Bun.sql`](https://bun.sh/docs/runtime/sql) queries, checked
+> against your real schema at build time.
 
-You write SQL in [`Bun.sql`](https://bun.sh/docs/runtime/sql) tagged templates, each
-tagged with a name. A codegen step builds your schema in-process from your migrations
-— real Postgres via [PGlite](https://pglite.dev/) or SQLite, no Docker and no running
-server — plans every query against it, and emits the result types as a `.d.ts`. A
-query that drifts from the schema (a missing column, a bad cast) fails codegen; a
-mismatched field or null-unsafe access fails `tsc`.
+You write SQL in `Bun.sql` tagged templates, each tagged with a name. A codegen step
+builds your schema in-process from your migrations — real Postgres via
+[PGlite](https://pglite.dev/) or SQLite, no Docker and no running server — plans every
+query against it, and emits the result types as a `.d.ts`. A query that drifts from the
+schema (a missing column, a bad cast) fails codegen; a mismatched field or null-unsafe
+access fails `tsc`.
 
 No ORM and no hand-written row types. `withTypes` is a pass-through over Bun's native
 client, so binding, fragments, and prepared-statement caching all stay native, and the
