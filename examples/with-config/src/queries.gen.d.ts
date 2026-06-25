@@ -2,7 +2,7 @@
 // Run the generator to refresh.
 
 /** Result of query `GetArticle`. */
-interface IGetArticleResult {
+export interface IGetArticleResult {
     id: string;
     /** Case-insensitive URL slug. */
     slug: string;
@@ -12,7 +12,7 @@ interface IGetArticleResult {
 }
 
 /** Result of query `ListArticlesWithAuthor`. */
-interface IListArticlesWithAuthorResult {
+export interface IListArticlesWithAuthorResult {
     id: string;
     title: string;
     /** Case-insensitive contact address. */

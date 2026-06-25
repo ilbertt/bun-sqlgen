@@ -2,7 +2,7 @@
 // Run the generator to refresh.
 
 /** Result of query `ListDeals`. */
-interface IListDealsResult {
+export interface IListDealsResult {
     id: number;
     status: string;
     amount: number;
@@ -10,7 +10,7 @@ interface IListDealsResult {
 }
 
 /** Result of query `GetDeal`. */
-interface IGetDealResult {
+export interface IGetDealResult {
     id: number;
     amount: number;
     attachment: Uint8Array | null;
@@ -18,26 +18,26 @@ interface IGetDealResult {
 }
 
 /** Result of query `GetUserDeals`. */
-interface IGetUserDealsResult {
+export interface IGetUserDealsResult {
     id: number | null;
     email: string | null;
     amount: number | null;
 }
 
 /** Result of query `UserEmails`. */
-interface IUserEmailsResult {
+export interface IUserEmailsResult {
     email: string;
     amount: number | null;
 }
 
 /** Result of query `DealStats`. */
-interface IDealStatsResult {
+export interface IDealStatsResult {
     total: number | null;
     loud: unknown | null;
 }
 
 /** Result of query `SearchDeals`. */
-interface ISearchDealsResult {
+export interface ISearchDealsResult {
     id: number;
     status: string;
     amount: number;
