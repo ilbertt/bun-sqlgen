@@ -86,7 +86,10 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
       matched.add(f);
     }
   }
-  const sourceFiles = [...matched].filter((f) => f !== outPath && !isGenerated(f));
+  // Sort so the discovery — and therefore the emitted registry order — is stable
+  // across platforms; Bun.Glob yields filesystem order, which differs (macOS vs
+  // Linux CI), making the committed output churn and `--check` fail spuriously.
+  const sourceFiles = [...matched].filter((f) => f !== outPath && !isGenerated(f)).sort();
 
   // Explicit `--dialect` wins over config; default Postgres. Extensions are a
   // PGlite (Postgres) concept; a SQLite config carries none.
