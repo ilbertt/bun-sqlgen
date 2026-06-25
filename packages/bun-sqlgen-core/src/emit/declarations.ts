@@ -2,6 +2,16 @@ import ts from 'typescript';
 import { f, propertyName, resultName, typeNode } from '#emit/ast.ts';
 import type { EmitModel, ResolvedField } from '#types.ts';
 
+// The registry interfaces the generated module emits; names must match what
+// `@ilbertt/bun-sqlgen` declares. `REGISTRY` is the exported, importable registry;
+// `GLOBAL_REGISTRY` is the package's ambient interface it merges into.
+const REGISTRY = 'Queries';
+const GLOBAL_REGISTRY = 'QueryResults';
+
+function exported(): ts.Modifier {
+  return f.createModifier(ts.SyntaxKind.ExportKeyword);
+}
+
 function fieldSignature(field: ResolvedField): ts.PropertySignature {
   const type = typeNode(field.nullable ? `${field.ts} | null` : field.ts);
   const sig = f.createPropertySignature(undefined, propertyName(field.name), undefined, type);
@@ -32,7 +42,7 @@ function fieldSignature(field: ResolvedField): ts.PropertySignature {
 // access path; the export just keeps the underlying name reachable.
 export function resultInterface(q: EmitModel): ts.InterfaceDeclaration {
   const node = f.createInterfaceDeclaration(
-    [f.createModifier(ts.SyntaxKind.ExportKeyword)],
+    [exported()],
     resultName(q.name),
     undefined,
     undefined,
@@ -47,18 +57,17 @@ export function resultInterface(q: EmitModel): ts.InterfaceDeclaration {
   return node;
 }
 
-// `declare module '<package>' { interface QueryResults { Foo: IFooResult; ... } }` —
-// merges each query name→row into the package's registry, so `withTypes` types it.
-export function augmentation(input: {
-  queries: EmitModel[];
-  packageName: string;
-}): ts.ModuleDeclaration {
-  const registry = f.createInterfaceDeclaration(
+// `export interface Queries { Foo: IFooResult; ... }` — the importable registry of
+// query name→row. Threaded explicitly via `withTypes<Queries>(sql)` so the types
+// travel through the import graph; also the single source the global augmentation
+// extends.
+export function registryInterface(queries: EmitModel[]): ts.InterfaceDeclaration {
+  return f.createInterfaceDeclaration(
+    [exported()],
+    REGISTRY,
     undefined,
-    'QueryResults',
     undefined,
-    undefined,
-    input.queries.map((q) =>
+    queries.map((q) =>
       f.createPropertySignature(
         undefined,
         propertyName(q.name),
@@ -66,6 +75,23 @@ export function augmentation(input: {
         f.createTypeReferenceNode(resultName(q.name)),
       ),
     ),
+  );
+}
+
+// `declare module '<package>' { interface QueryResults extends Queries {} }` — merges
+// the registry into the package's global `QueryResults`, so `withTypes(sql)` (no
+// explicit registry) stays typed for single-package use.
+export function augmentation(input: { packageName: string }): ts.ModuleDeclaration {
+  const registry = f.createInterfaceDeclaration(
+    undefined,
+    GLOBAL_REGISTRY,
+    undefined,
+    [
+      f.createHeritageClause(ts.SyntaxKind.ExtendsKeyword, [
+        f.createExpressionWithTypeArguments(f.createIdentifier(REGISTRY), undefined),
+      ]),
+    ],
+    [],
   );
   return f.createModuleDeclaration(
     [f.createModifier(ts.SyntaxKind.DeclareKeyword)],
