@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.1] - 2026-06-25
+
+### 🐛 Bug Fixes
+
+- Deterministic, portable codegen output (#11)
+
 ## [0.2.0] - 2026-06-24
 
 ### 🚀 Features
