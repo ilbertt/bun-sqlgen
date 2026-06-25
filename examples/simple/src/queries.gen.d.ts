@@ -2,7 +2,7 @@
 // Run the generator to refresh.
 
 /** Result of query `GetUserDeals`. */
-interface IGetUserDealsResult {
+export interface IGetUserDealsResult {
     id: string;
     email: string;
     display_name: string | null;
@@ -11,14 +11,14 @@ interface IGetUserDealsResult {
 }
 
 /** Result of query `ListDeals`. */
-interface IListDealsResult {
+export interface IListDealsResult {
     id: string;
     status: string;
     amount: string;
 }
 
 /** Result of query `GetDealSummaries`. */
-interface IGetDealSummariesResult {
+export interface IGetDealSummariesResult {
     id: string;
     status: string;
     email: string;
@@ -29,7 +29,7 @@ interface IGetDealSummariesResult {
 }
 
 /** Result of query `ListDealDetails`. */
-interface IListDealDetailsResult {
+export interface IListDealDetailsResult {
     deal_id: string;
     status: string;
     amount: string;
@@ -39,20 +39,20 @@ interface IListDealDetailsResult {
 }
 
 /** Result of query `SearchDeals`. */
-interface ISearchDealsResult {
+export interface ISearchDealsResult {
     id: string;
     status: string;
     amount: string;
 }
 
 /** Result of query `RecentDeals`. */
-interface IRecentDealsResult {
+export interface IRecentDealsResult {
     id: string;
     status: string;
 }
 
 /** Result of query `GetDealMeta`. */
-interface IGetDealMetaResult {
+export interface IGetDealMetaResult {
     id: string;
     stage: "lead" | "negotiation" | "won" | "lost";
     tags: string[];
@@ -65,7 +65,7 @@ interface IGetDealMetaResult {
 }
 
 /** Result of query `GetDealDetails`. */
-interface IGetDealDetailsResult {
+export interface IGetDealDetailsResult {
     id: string;
     /** Free-form metadata captured during the deal. */
     details: {
@@ -75,7 +75,7 @@ interface IGetDealDetailsResult {
 }
 
 /** Result of query `CountDeals`. */
-interface ICountDealsResult {
+export interface ICountDealsResult {
     total: string | null;
 }
 

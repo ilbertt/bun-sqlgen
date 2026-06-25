@@ -25,12 +25,14 @@ function fieldSignature(field: ResolvedField): ts.PropertySignature {
   return sig;
 }
 
-// The row interface backing one registry entry. Module-local (not exported): the
-// public way to name a row type is `QueryResults['Name']`, so there is a single
-// access path and no second importable surface to keep in sync.
+// The row interface backing one registry entry. Exported so the row type stays
+// nameable when a consumer re-emits it in a `.d.ts` (declaration emission or
+// bundling) — TypeScript dereferences `QueryResults['Name']` to this interface and
+// errors (TS4053) if it can't name it. `QueryResults['Name']` is still the intended
+// access path; the export just keeps the underlying name reachable.
 export function resultInterface(q: EmitModel): ts.InterfaceDeclaration {
   const node = f.createInterfaceDeclaration(
-    undefined,
+    [f.createModifier(ts.SyntaxKind.ExportKeyword)],
     resultName(q.name),
     undefined,
     undefined,
