@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 import { join } from 'node:path';
+import { REPO_ROOT } from '#paths.ts';
 
-const version = process.argv[2];
+const version = Bun.argv[2];
 if (!version) {
   throw new Error('usage: bun src/set-version.ts <version>');
 }
 
-const REPO_ROOT = join(import.meta.dir, '..', '..', '..');
 const PACKAGE_JSON_PATH = join(REPO_ROOT, 'packages/bun-sqlgen/pkg/package.json');
 
 const pkg = await Bun.file(PACKAGE_JSON_PATH).json();

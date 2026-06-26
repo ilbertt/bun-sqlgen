@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
-import { join } from 'node:path';
 import { runGitCliff } from 'git-cliff';
-
-const REPO_ROOT = join(import.meta.dir, '..', '..', '..');
+import { writeOutput } from '#output.ts';
+import { REPO_ROOT } from '#paths.ts';
 
 const { stdout } = await runGitCliff(
   { latest: true, strip: 'header' },
@@ -10,11 +9,4 @@ const { stdout } = await runGitCliff(
 );
 const notes = String(stdout).trimEnd();
 
-// When run via `bun run --filter`, bun prefixes stdout with a package label,
-// so write to the file in `RELEASE_NOTES_FILE` when set; fall back to stdout.
-const outFile = process.env.RELEASE_NOTES_FILE;
-if (outFile) {
-  await Bun.write(outFile, notes);
-} else {
-  console.log(notes);
-}
+await writeOutput({ envVar: 'RELEASE_NOTES_FILE', content: notes });
