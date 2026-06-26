@@ -43,14 +43,17 @@ export interface ISearchDealsResult {
     amount: number;
 }
 
+export interface Queries {
+    ListDeals: IListDealsResult;
+    GetDeal: IGetDealResult;
+    GetUserDeals: IGetUserDealsResult;
+    UserEmails: IUserEmailsResult;
+    DealStats: IDealStatsResult;
+    SearchDeals: ISearchDealsResult;
+}
+
 declare module "@repo/bun-sqlgen" {
-    interface QueryResults {
-        ListDeals: IListDealsResult;
-        GetDeal: IGetDealResult;
-        GetUserDeals: IGetUserDealsResult;
-        UserEmails: IUserEmailsResult;
-        DealStats: IDealStatsResult;
-        SearchDeals: ISearchDealsResult;
+    interface QueryResults extends Queries {
     }
 }
 

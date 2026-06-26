@@ -1,5 +1,5 @@
 import type { SQL, TransactionSQL } from 'bun';
-import type { TypedSQL } from './registry';
+import type { QueryResults, TypedSQL } from './registry';
 
 // Methods that hand a fresh SQL client to a callback. We wrap that client too, so a
 // `tx.QueryName\`...\`` inside the callback resolves the same way as on the parent.
@@ -19,9 +19,15 @@ const SCOPED_CLIENT_METHODS: ReadonlySet<string> = new Set([
  * untyped `sql` escape hatch and real methods (`sql.begin`, …) keep working. The
  * client passed to a `begin`/`transaction`/`savepoint` callback is wrapped too, so
  * named queries work inside transactions.
+ *
+ * `Q` is the query registry to type against; it defaults to the global `QueryResults`
+ * (filled by the generated file's `declare module` augmentation). Pass the generated
+ * `Queries` explicitly — `withTypes<Queries>(sql)` — when the typed client's types
+ * cross a package boundary, so they resolve through the import graph rather than
+ * relying on the augmentation being in every consumer's program.
  */
-export function withTypes(sql: SQL): TypedSQL {
-  return wrap(sql) as TypedSQL;
+export function withTypes<Q = QueryResults>(sql: SQL): TypedSQL<Q> {
+  return wrap(sql) as TypedSQL<Q>;
 }
 
 function wrap(sql: SQL): SQL {

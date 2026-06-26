@@ -20,10 +20,13 @@ export interface IListArticlesWithAuthorResult {
     name: string | null;
 }
 
+export interface Queries {
+    GetArticle: IGetArticleResult;
+    ListArticlesWithAuthor: IListArticlesWithAuthorResult;
+}
+
 declare module "@repo/bun-sqlgen" {
-    interface QueryResults {
-        GetArticle: IGetArticleResult;
-        ListArticlesWithAuthor: IListArticlesWithAuthorResult;
+    interface QueryResults extends Queries {
     }
 }
 

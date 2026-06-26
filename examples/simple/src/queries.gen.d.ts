@@ -79,17 +79,20 @@ export interface ICountDealsResult {
     total: string | null;
 }
 
+export interface Queries {
+    GetUserDeals: IGetUserDealsResult;
+    ListDeals: IListDealsResult;
+    GetDealSummaries: IGetDealSummariesResult;
+    ListDealDetails: IListDealDetailsResult;
+    SearchDeals: ISearchDealsResult;
+    RecentDeals: IRecentDealsResult;
+    GetDealMeta: IGetDealMetaResult;
+    GetDealDetails: IGetDealDetailsResult;
+    CountDeals: ICountDealsResult;
+}
+
 declare module "@repo/bun-sqlgen" {
-    interface QueryResults {
-        GetUserDeals: IGetUserDealsResult;
-        ListDeals: IListDealsResult;
-        GetDealSummaries: IGetDealSummariesResult;
-        ListDealDetails: IListDealDetailsResult;
-        SearchDeals: ISearchDealsResult;
-        RecentDeals: IRecentDealsResult;
-        GetDealMeta: IGetDealMetaResult;
-        GetDealDetails: IGetDealDetailsResult;
-        CountDeals: ICountDealsResult;
+    interface QueryResults extends Queries {
     }
 }
 
