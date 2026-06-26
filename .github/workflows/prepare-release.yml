@@ -21,15 +21,19 @@ jobs:
 
       - name: Compute next version
         id: version
-        run: echo "version=$(bun scripts/bumped-version.ts)" >> "$GITHUB_OUTPUT"
+        env:
+          BUMPED_VERSION_FILE: ${{ runner.temp }}/bumped-version.txt
+        run: |
+          bun run --filter "@repo/internal-scripts" bumped-version
+          echo "version=$(cat "$BUMPED_VERSION_FILE")" >> "$GITHUB_OUTPUT"
 
       - name: Update package.json version
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: bun scripts/set-version.ts "$VERSION"
+        run: bun run --filter "@repo/internal-scripts" set-version "$VERSION"
 
       - name: Generate changelog
-        run: bun scripts/generate-changelog.ts
+        run: bun run --filter "@repo/internal-scripts" generate-changelog
 
       - name: Configure git user
         run: |

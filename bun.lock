@@ -11,7 +11,6 @@
         "@commitlint/format": "^21.0.1",
         "@commitlint/types": "^21.0.1",
         "@types/bun": "catalog:",
-        "git-cliff": "^2.13.1",
         "turbo": "^2.9.18",
         "typescript": "catalog:",
       },
@@ -82,6 +81,15 @@
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
         "@types/bun": "catalog:",
+      },
+    },
+    "packages/internal-scripts": {
+      "name": "@repo/internal-scripts",
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "@types/bun": "catalog:",
+        "git-cliff": "^2.13.1",
+        "typescript": "catalog:",
       },
     },
     "packages/pack-utils": {
@@ -177,6 +185,8 @@
     "@repo/example-sqlite": ["@repo/example-sqlite@workspace:examples/sqlite"],
 
     "@repo/example-with-config": ["@repo/example-with-config@workspace:examples/with-config"],
+
+    "@repo/internal-scripts": ["@repo/internal-scripts@workspace:packages/internal-scripts"],
 
     "@repo/pack-utils": ["@repo/pack-utils@workspace:packages/pack-utils"],
 

@@ -29,7 +29,6 @@
     "@commitlint/format": "^21.0.1",
     "@commitlint/types": "^21.0.1",
     "@types/bun": "catalog:",
-    "git-cliff": "^2.13.1",
     "typescript": "catalog:",
     "turbo": "^2.9.18"
   },
