@@ -39,6 +39,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ github.ref_name }}
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
         run: |
-          body=$(bun scripts/release-notes.ts)
-          gh release create "$TAG_NAME" --title "$TAG_NAME" --notes "$body"
+          bun run --filter "@repo/internal-scripts" release-notes
+          gh release create "$TAG_NAME" --title "$TAG_NAME" --notes-file "$RELEASE_NOTES_FILE"
