@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-06-26
+
+### 🚀 Features
+
+- Let withTypes take the query registry explicitly (#13)
+
 ## [0.2.1] - 2026-06-25
 
 ### 🐛 Bug Fixes
