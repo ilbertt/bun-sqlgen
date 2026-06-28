@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.1] - 2026-06-28
+
+### 🚜 Refactor
+
+- Move release scripts into @repo/internal-scripts package (#15)
+
+### ⚙️ Miscellaneous Tasks
+
+- Update dependencies (#16)
+
 ## [0.3.0] - 2026-06-26
 
 ### 🚀 Features
