@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-07-09
+
+### 📦 Build & Dependencies
+
+- Update dependencies (#19)
+- [**breaking**] Bump TypeScript to v7 (#18)
+
 ## [0.3.1] - 2026-06-28
 
 ### 🚜 Refactor
