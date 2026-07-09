@@ -29,14 +29,13 @@
     "@electric-sql/pglite": "catalog:",
     "@parshjs/core": "^0.0.10",
     "@repo/bun-sqlgen-core": "workspace:*",
+    "@typescript/typescript6": "catalog:",
     "zod": "catalog:"
-  },
-  "peerDependencies": {
-    "typescript": "catalog:"
   },
   "devDependencies": {
     "@parshjs/codegen": "^0.0.5",
     "@repo/pack-utils": "workspace:*",
-    "@repo/typescript-config": "workspace:*"
+    "@repo/typescript-config": "workspace:*",
+    "@types/bun": "catalog:"
   }
 }

@@ -1,4 +1,4 @@
-import type ts from 'typescript';
+import type ts from '@typescript/typescript6';
 import { printNode } from '#emit/ast.ts';
 import { augmentation, registryInterface, resultInterface } from '#emit/declarations.ts';
 import type { EmitModel } from '#types.ts';

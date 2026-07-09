@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 
 // Shared factory + printer. Everything in the generated module is built as AST and
 // run through one printer, so output is valid by construction (escaping, quoting,

@@ -19,9 +19,8 @@ const LICENSE_DESTINATION_PATH = join(PKG_DIR, 'LICENSE');
 // Types are explicit to make sure the we pick existing dependencies
 const RUNTIME_DEPENDENCIES: Extract<
   keyof typeof packageJson.dependencies,
-  '@electric-sql/pglite'
->[] = ['@electric-sql/pglite'];
-const PEER_DEPENDENCIES = Object.keys(packageJson.peerDependencies);
+  '@electric-sql/pglite' | '@typescript/typescript6'
+>[] = ['@electric-sql/pglite', '@typescript/typescript6'];
 
 // Regenerate the parsh command tree first so the bundle can never embed a stale
 // one. Reuses the `codegen` script so the args stay single-sourced.
@@ -37,7 +36,7 @@ const cliBuildResult = await Bun.build({
   root: SRC_DIR,
   outdir: DIST_DIR,
   target: 'bun',
-  external: [...RUNTIME_DEPENDENCIES, ...PEER_DEPENDENCIES],
+  external: [...RUNTIME_DEPENDENCIES],
 });
 assertBuildSuccess({ buildResult: cliBuildResult });
 printBuildOutput({ buildResult: cliBuildResult });
@@ -55,7 +54,6 @@ await setPackageJsonDependencies({
   sourcePackageJsonPath: internalPackageJsonPath,
   targetPackageJsonPath: publicPackageJsonPath,
   dependencies: RUNTIME_DEPENDENCIES,
-  peerDependencies: PEER_DEPENDENCIES,
 });
 
 console.log('✅ Done');

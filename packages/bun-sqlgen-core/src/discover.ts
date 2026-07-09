@@ -1,5 +1,5 @@
+import ts from '@typescript/typescript6';
 import type { ReservedSQL, SavepointSQL, SQL, TransactionSQL } from 'bun';
-import ts from 'typescript';
 import type { Dialect, DiscoveredQuery, WritableColumns } from '#types.ts';
 
 // Positional bind placeholder for the dialect: Postgres `$n`, SQLite `?n`. Both
