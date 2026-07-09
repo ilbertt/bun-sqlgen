@@ -13,10 +13,11 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "catalog:",
-    "typescript": "catalog:"
+    "@typescript/typescript6": "catalog:"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
-    "@types/bun": "catalog:"
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
   }
 }

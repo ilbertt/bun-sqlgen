@@ -35,9 +35,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@electric-sql/pglite": "^0.5.2"
-  },
-  "peerDependencies": {
-    "typescript": "^5.9.3"
+    "@electric-sql/pglite": "^0.5.3",
+    "@typescript/typescript6": "^6.0.2"
   }
 }

@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 import { f, propertyName, resultName, typeNode } from '#emit/ast.ts';
 import type { EmitModel, ResolvedField } from '#types.ts';
 
