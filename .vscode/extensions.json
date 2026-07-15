@@ -2,6 +2,7 @@
   "recommendations": [
     "biomejs.biome",
     "editorconfig.editorconfig",
-    "oven.bun-vscode"
+    "oven.bun-vscode",
+    "typescriptteam.native-preview"
   ]
 }
