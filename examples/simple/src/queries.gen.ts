@@ -79,6 +79,24 @@ export interface INamedUsersResult {
     display_name: NonNullable<IUsersColumns["display_name"]>;
 }
 
+/** Result of query `UserSearchKeys`. */
+export interface IUserSearchKeysResult {
+    /** Lowercased email, for lookups. */
+    search_key: string;
+}
+
+/** Result of query `DealSearchKeys`. */
+export interface IDealSearchKeysResult {
+    /** Lowercased email, for lookups. */
+    search_key: string;
+}
+
+/** Result of query `OptionalSearchKeys`. */
+export interface IOptionalSearchKeysResult {
+    /** Lowercased status, for lookups. */
+    search_key: string | null;
+}
+
 export interface Queries {
     GetUserDeals: IGetUserDealsResult;
     ListDeals: IListDealsResult;
@@ -90,6 +108,9 @@ export interface Queries {
     GetDealDetails: IGetDealDetailsResult;
     CountDeals: ICountDealsResult;
     NamedUsers: INamedUsersResult;
+    UserSearchKeys: IUserSearchKeysResult;
+    DealSearchKeys: IDealSearchKeysResult;
+    OptionalSearchKeys: IOptionalSearchKeysResult;
 }
 
 /** Columns of `deal_details`. */
@@ -136,6 +157,8 @@ export interface IDealsColumns {
     user_id: string;
     amount: string;
     status: string;
+    /** Lowercased status, for lookups. */
+    search_key: string;
 }
 
 /** Schema of `deals`. */
@@ -167,6 +190,8 @@ export interface IUsersColumns {
     display_name: string | null;
     created_at: Date;
     updated_at: Date;
+    /** Lowercased email, for lookups. */
+    search_key: string;
 }
 
 /** Schema of `users`. */

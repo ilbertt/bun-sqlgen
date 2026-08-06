@@ -17,6 +17,13 @@ rather than repeating types — `ListDealDetails.deal_id` is `IDealsColumns['id'
 though the query selects it through a view — and `NamedUsers` shows a `@notNull` pragma
 narrowing a schema-nullable column to `NonNullable<…>`.
 
+`users` and `deals` both carry a `search_key` `VIRTUAL` generated column commented
+`@notNull`, covering [#23](https://github.com/ilbertt/bun-sqlgen/issues/23): a generated
+column reaches the plan as its generating expression, so its comment is matched by
+relation and name. `UserSearchKeys` (one table), `DealSearchKeys` (a join where both
+tables comment the name) and `OptionalSearchKeys` (widened back to nullable by a
+`LEFT JOIN`) pin all three outcomes.
+
 Editing a query and running `codegen` is all it takes; misusing a result type
 (`row.whatever`, `row.display_name.length` on a nullable column) becomes a `tsc`
 error, and a query with invalid SQL fails `codegen` with the real Postgres message.

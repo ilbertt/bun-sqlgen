@@ -56,7 +56,17 @@ export type Provenance =
       outerNullable: boolean;
       candidates?: string[];
     }
-  | { kind: 'expr'; expr: string };
+  | {
+      kind: 'expr';
+      expr: string;
+      /**
+       * The single relation the expression's inputs belong to, when they agree on one.
+       * A generated column reaches the plan as its generating expression, so this is
+       * the only thing tying it back to the table whose comment documents it.
+       */
+      relation?: string;
+      outerNullable: boolean;
+    };
 
 export interface DescribeResult {
   fields: ResultField[];

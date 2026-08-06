@@ -36,7 +36,13 @@ export function resolveFields(input: {
     // single in-scope relation.
     const comment: ColumnOverride | undefined = source
       ? columnOverrides[source.table]?.[source.column]
-      : commentByName({ name: f.name, relations: described.relations, columnOverrides });
+      : commentByName({
+          name: f.name,
+          // An expression that traced to one relation names its owner; otherwise every
+          // relation in scope is a candidate and only an unambiguous match counts.
+          relations: prov?.kind === 'expr' && prov.relation ? [prov.relation] : described.relations,
+          columnOverrides,
+        });
 
     // A per-query `@type` is the most specific override there is: it names the exact
     // result column and gives its full TS type verbatim (nullability included), so it
@@ -82,8 +88,10 @@ export function resolveFields(input: {
             ? 'outer-join'
             : 'catalog';
     } else if (comment?.notNull) {
-      nullable = false;
-      reason = 'comment';
+      // A comment describes the column, not the query: pulling it through an outer join
+      // still makes it nullable here.
+      nullable = prov?.outerNullable === true;
+      reason = nullable ? 'outer-join' : 'comment';
     } else if (comment?.nullable) {
       nullable = true;
       reason = 'comment';

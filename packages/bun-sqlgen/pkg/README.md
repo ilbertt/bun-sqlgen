@@ -302,6 +302,12 @@ widening still applies on top (a `@notNull` column pulled through a `LEFT JOIN` 
 still nullable in that query). Only the `@…` tokens are read for behavior; the
 rest of the comment is carried through as documentation.
 
+This reaches **generated columns**, which are the main reason to comment one: a
+`GENERATED … VIRTUAL` column arrives as the expression that generates it
+(`lower(u.email)`), not as a column, so its comment is matched by relation and name
+rather than by provenance. That works even when several tables in the query comment the
+same column name — the expression names the alias it reads from, so the right table wins.
+
 ## Boundaries
 
 - **Dynamic fragments** composed at runtime (`` sql`... ${sql(cols)} ...` ``) can't

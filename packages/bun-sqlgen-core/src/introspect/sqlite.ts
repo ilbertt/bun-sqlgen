@@ -76,10 +76,12 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
         fields.push({ name, ts, tsNote: note });
         // A declared type means a real table column; trace it by name (the catalog
         // step resolves the owning relation). No declared type → an expression.
+        // No `relation`: SQLite's metadata never names an expression's inputs. Without
+        // column comments there is no override to disambiguate anyway.
         provenance.push(
           declared
             ? { kind: 'column', column: name, table: null, candidates: relations, outerNullable }
-            : { kind: 'expr', expr: name },
+            : { kind: 'expr', expr: name, outerNullable },
         );
       }
       return Promise.resolve({ fields, provenance, relations });

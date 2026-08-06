@@ -390,8 +390,36 @@ function analyzePlan(input: { plan: PlanNode; fieldCount: number }): {
         outerNullable: relations.length > 0 && nonNullableRelations.length === 0,
       };
     }
-    // Functions, OVER(), literals, CASE, casts.
-    return { kind: 'expr', expr };
+    // Functions, OVER(), literals, CASE, casts — and generated columns, which reach the
+    // plan as the expression that generates them.
+    return { kind: 'expr', expr, ...expressionOrigin({ expr, aliasToRel, nullableAliases }) };
   });
   return { provenance, relations };
+}
+
+const QUALIFIED_REF = /\b([a-zA-Z_][\w$]*)\.[a-zA-Z_][\w$]*/g;
+
+/**
+ * The relation an expression reads from, when all of its inputs agree on one.
+ * Postgres qualifies an expression's column references (`uuid_extract_timestamp(a.id)`)
+ * exactly when more than one relation is in scope — which is exactly when matching a
+ * comment override by column name alone would be ambiguous. Names that aren't aliases
+ * in this plan (a schema-qualified function like `paradedb.score(…)`) are ignored.
+ */
+function expressionOrigin(input: {
+  expr: string;
+  aliasToRel: Record<string, string>;
+  nullableAliases: Set<string>;
+}): { relation?: string; outerNullable: boolean } {
+  const aliases = [...new Set([...input.expr.matchAll(QUALIFIED_REF)].map((m) => m[1]!))].filter(
+    (alias) => alias in input.aliasToRel,
+  );
+  const relations = [...new Set(aliases.map((alias) => input.aliasToRel[alias]!))];
+  if (relations.length !== 1) {
+    return { outerNullable: false };
+  }
+  return {
+    relation: relations[0],
+    outerNullable: aliases.some((alias) => input.nullableAliases.has(alias)),
+  };
 }

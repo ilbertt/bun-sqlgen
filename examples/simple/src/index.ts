@@ -98,8 +98,16 @@ console.log(named[0]?.display_name.length); // string — no null check needed
 
 // The schema block: every table and view the migrations create, typed the same way as
 // a query selecting it — no query has to mention a table for its row type to exist.
+// It's the shape a row *reads back* as, generated columns included — not an insertable
+// one, so `search_key` is here even though the database computes it.
 type DealRow = DatabaseTables['deals']['columns'];
-const draft: DealRow = { id: '1', user_id: '1', amount: '0', status: 'draft' };
+const draft: DealRow = {
+  id: '1',
+  user_id: '1',
+  amount: '0',
+  status: 'draft',
+  search_key: 'draft',
+};
 console.log(draft.status);
 
 // @ts-expect-error — `deals` has no `title` column
@@ -114,3 +122,23 @@ console.log(onConflict);
 // @ts-expect-error — `deals` has no index by that name
 const missingIndex: DatabaseTables['deals']['indexes'] = 'deals_status_idx';
 console.log(missingIndex);
+
+// A VIRTUAL generated column reaches the plan as its generating expression, so it has
+// no column provenance — the `@notNull` on its COMMENT ON COLUMN is what types it.
+const keys = await sql.UserSearchKeys`
+  SELECT u.search_key FROM users u WHERE u.id = ${1}
+`;
+console.log(keys[0]?.search_key.length); // string
+
+// Same column, but now two joined tables both comment a `search_key`.
+const joined = await sql.DealSearchKeys`
+  SELECT u.search_key FROM users u JOIN deals d ON d.user_id = u.id
+`;
+console.log(joined[0]?.search_key.length); // string
+
+// The comment describes the column, not the query: pulled through a LEFT JOIN, the
+// `@notNull` generated column is nullable here after all.
+const optional = await sql.OptionalSearchKeys`
+  SELECT d.search_key FROM users u LEFT JOIN deals d ON d.user_id = u.id
+`;
+console.log(optional[0]?.search_key?.length); // string | null
