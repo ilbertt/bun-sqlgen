@@ -25,8 +25,48 @@ export interface Queries {
     ListArticlesWithAuthor: IListArticlesWithAuthorResult;
 }
 
+/** Columns of `articles`. */
+export interface IArticlesColumns {
+    id: string;
+    author_id: string;
+    /** Case-insensitive URL slug. */
+    slug: string;
+    title: string;
+    body: string | null;
+    created_by: string;
+}
+
+/** Schema of `articles`. */
+export interface IArticlesTable {
+    columns: IArticlesColumns;
+    indexes: "articles_author_idx" | "articles_pkey" | "articles_slug_idx" | "articles_slug_key";
+    constraints: "articles_author_id_fkey" | "articles_pkey" | "articles_slug_key";
+}
+
+/** Columns of `authors`. */
+export interface IAuthorsColumns {
+    id: string;
+    /** Case-insensitive contact address. */
+    email: string;
+    name: string;
+}
+
+/** Schema of `authors`. */
+export interface IAuthorsTable {
+    columns: IAuthorsColumns;
+    indexes: "authors_email_key" | "authors_pkey";
+    constraints: "authors_email_key" | "authors_pkey";
+}
+
+export interface Tables {
+    articles: IArticlesTable;
+    authors: IAuthorsTable;
+}
+
 declare module "@repo/bun-sqlgen" {
     interface QueryResults extends Queries {
+    }
+    interface DatabaseTables extends Tables {
     }
 }
 

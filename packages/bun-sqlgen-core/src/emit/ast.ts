@@ -17,6 +17,21 @@ const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 // The exported interface name for a query's row (also the registry value type).
 export const resultName = (name: string): string => `I${cap(name)}Result`;
 
+// `deal_meta` -> `DealMeta`, the base for a relation's interface names. Table names are
+// free-form, so this isn't injective (`deal_meta` and `dealMeta` collapse together) —
+// callers pass the result through `uniqueBases` before naming anything.
+export const pascalCase = (name: string): string =>
+  name
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map(cap)
+    .join('');
+
+// The exported interface names for a relation's columns and its schema entry, both
+// built from a base already made unique across the schema.
+export const columnsName = (base: string): string => `I${base}Columns`;
+export const tableName = (base: string): string => `I${base}Table`;
+
 const VALID_IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 
 export function propertyName(name: string): ts.PropertyName {

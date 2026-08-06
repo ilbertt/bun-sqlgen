@@ -51,6 +51,16 @@ bun add @ilbertt/bun-sqlgen
    a compile error and `user.display_name.length` is flagged as possibly-null, all by
    plain `tsc`.
 
+   The same file also describes your schema — every table and view with its columns,
+   index names and constraint names:
+
+   ```ts
+   import type { DatabaseTables } from '@ilbertt/bun-sqlgen';
+
+   type UserRow = DatabaseTables['users']['columns']; // { id: string; email: string; … }
+   type UserIndex = DatabaseTables['users']['indexes']; // 'users_pkey' | 'users_email_idx'
+   ```
+
 ## Examples
 
 Runnable projects live in the [`examples/`](./examples) folder.

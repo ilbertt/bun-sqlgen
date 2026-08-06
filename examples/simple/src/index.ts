@@ -1,3 +1,4 @@
+import type { DatabaseTables } from '@repo/bun-sqlgen';
 import { withTypes } from '@repo/bun-sqlgen';
 import { SQL } from 'bun';
 
@@ -86,3 +87,22 @@ console.log(meta2[0]?.details?.priority); // { priority: number; notes: string }
 
 const counts = await sql.CountDeals`SELECT count(*) AS total FROM deals`;
 console.log(counts[0]?.total); // string | null
+
+// The schema block: every table and view the migrations create, typed the same way as
+// a query selecting it — no query has to mention a table for its row type to exist.
+type DealRow = DatabaseTables['deals']['columns'];
+const draft: DealRow = { id: '1', user_id: '1', amount: '0', status: 'draft' };
+console.log(draft.status);
+
+// @ts-expect-error — `deals` has no `title` column
+const bad: DealRow = { ...draft, title: 'nope' };
+console.log(bad);
+
+// Index and constraint names come along as literal unions, so anything naming one —
+// an `ON CONFLICT ON CONSTRAINT`, a migration helper — is checked against the schema.
+const onConflict: DatabaseTables['deal_meta']['constraints'] = 'deal_meta_pkey';
+console.log(onConflict);
+
+// @ts-expect-error — `deals` has no index by that name
+const missingIndex: DatabaseTables['deals']['indexes'] = 'deals_status_idx';
+console.log(missingIndex);

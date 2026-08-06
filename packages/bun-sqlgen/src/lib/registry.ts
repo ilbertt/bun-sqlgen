@@ -22,6 +22,22 @@ import type { SQL, TransactionSQL } from 'bun';
 // biome-ignore lint/suspicious/noEmptyInterface: augmentation point — filled by generated files
 export interface QueryResults {}
 
+/**
+ * The global registry of table/view names → their schema, merged in by the generated
+ * file's `Tables` interface the same way `Queries` merges into `QueryResults`:
+ *
+ * ```ts
+ * type User = DatabaseTables['users']['columns']; // { id: string; email: string; … }
+ * type UserIndex = DatabaseTables['users']['indexes']; // 'users_pkey' | 'users_email_idx'
+ * ```
+ *
+ * Unlike `QueryResults` nothing consumes this at runtime — it exists so the schema the
+ * codegen already knows is nameable from application code. Import the generated
+ * `Tables` directly when the types cross a package boundary.
+ */
+// biome-ignore lint/suspicious/noEmptyInterface: augmentation point — filled by generated files
+export interface DatabaseTables {}
+
 // biome-ignore lint/complexity/useMaxParams: native template-tag signature
 type NamedTag<Row> = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Row[]>;
 

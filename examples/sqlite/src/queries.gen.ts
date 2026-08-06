@@ -52,8 +52,65 @@ export interface Queries {
     SearchDeals: ISearchDealsResult;
 }
 
+/** Columns of `deal_details`. */
+export interface IDealDetailsColumns {
+    deal_id: number | null;
+    status: string | null;
+    amount: number | null;
+    email: string | null;
+    display_name: string | null;
+}
+
+/** Schema of `deal_details`. */
+export interface IDealDetailsTable {
+    columns: IDealDetailsColumns;
+    indexes: never;
+    constraints: never;
+}
+
+/** Columns of `deals`. */
+export interface IDealsColumns {
+    id: number;
+    user_id: number;
+    amount: number;
+    status: string;
+    is_active: number;
+    closed_at: string | null;
+    attachment: Uint8Array | null;
+}
+
+/** Schema of `deals`. */
+export interface IDealsTable {
+    columns: IDealsColumns;
+    indexes: never;
+    constraints: never;
+}
+
+/** Columns of `users`. */
+export interface IUsersColumns {
+    id: number;
+    email: string;
+    display_name: string | null;
+    created_at: string;
+}
+
+/** Schema of `users`. */
+export interface IUsersTable {
+    columns: IUsersColumns;
+    indexes: never;
+    constraints: never;
+}
+
+export interface Tables {
+    deal_details: IDealDetailsTable;
+    deals: IDealsTable;
+    users: IUsersTable;
+}
+
 declare module "@repo/bun-sqlgen" {
     interface QueryResults extends Queries {
+    }
+    interface DatabaseTables extends Tables {
     }
 }
 

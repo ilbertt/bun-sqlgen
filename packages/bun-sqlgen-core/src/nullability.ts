@@ -8,6 +8,7 @@ import type {
   Provenance,
   RawColumnComments,
   ResolvedField,
+  SchemaTable,
 } from '#types.ts';
 
 /**
@@ -94,6 +95,33 @@ export function resolveFields(input: {
     }
 
     return { name: f.name, ts, nullable, reason, note, doc: comment?.doc };
+  });
+}
+
+/**
+ * The same resolution for a base relation's own columns: a column comment's `@type`
+ * overrides the introspector's type, its `@notNull`/`@nullable` override the schema's,
+ * and its prose becomes the field's JSDoc. No query is in scope here, so there are no
+ * per-query pragmas and no outer-join widening — just the column as the schema declares it.
+ */
+export function resolveTableColumns(input: {
+  table: SchemaTable;
+  columnOverrides: ColumnOverrides;
+}): ResolvedField[] {
+  const overrides = input.columnOverrides[input.table.name] ?? {};
+  return input.table.columns.map((column): ResolvedField => {
+    const comment = overrides[column.name];
+    const tsType = comment?.tsType;
+    const notNull =
+      comment?.notNull === true ? true : comment?.nullable === true ? false : column.notNull;
+    return {
+      name: column.name,
+      ts: tsType ?? column.ts,
+      nullable: !notNull,
+      reason: comment?.notNull || comment?.nullable ? 'comment' : 'catalog',
+      note: tsType ? undefined : column.tsNote,
+      doc: comment?.doc,
+    };
   });
 }
 

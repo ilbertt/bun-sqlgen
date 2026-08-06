@@ -43,6 +43,11 @@ export const command = defineCommand('generate [glob]', {
       schema: z.boolean().optional(),
       description: 'Run all checks (queries + stale types); writes nothing — the CI default.',
     },
+    'no-schema': {
+      schema: z.boolean().optional(),
+      description:
+        'Skip the schema block (every table and view with its columns, indexes and constraints).',
+    },
   },
   handler: async ({ params, options }) => {
     // `--check` is the umbrella that runs every check.
@@ -55,6 +60,8 @@ export const command = defineCommand('generate [glob]', {
       packageName: options.package,
       configPath: options.config,
       dialect: options.dialect,
+      // Absent, the config decides; the flag only ever turns the schema block off.
+      schema: options['no-schema'] ? false : undefined,
       checkQueries,
       checkStale,
     });

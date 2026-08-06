@@ -4,10 +4,22 @@ import { pathToFileURL } from 'node:url';
 import { createDiscoverer } from '#discover.ts';
 import { emitModule, GENERATED_MARKER } from '#emit/index.ts';
 import { createIntrospector } from '#introspect/index.ts';
-import { parseColumnComments, parseOverrides, resolveFields } from '#nullability.ts';
-import type { Dialect, DiscoveredQuery, EmitModel, IntrospectorOptions } from '#types.ts';
+import {
+  parseColumnComments,
+  parseOverrides,
+  resolveFields,
+  resolveTableColumns,
+} from '#nullability.ts';
+import type {
+  Dialect,
+  DiscoveredQuery,
+  EmitModel,
+  EmitTable,
+  IntrospectorOptions,
+} from '#types.ts';
 
-type LoadedConfig = Partial<Omit<IntrospectorOptions, 'migrationsDir'>>;
+type LoadedConfig = Partial<Omit<IntrospectorOptions, 'migrationsDir'>> &
+  Pick<GenerateOptions, 'schema'>;
 
 // Where the aggregated module lands when `--out` is omitted. A `.ts`, not a `.d.ts`:
 // the module is a normal source file, so it can carry values as well as types.
@@ -36,6 +48,11 @@ export interface GenerateOptions {
   cwd?: string;
   /** Database engine to introspect against. Overrides config; defaults to `postgres`. */
   dialect?: Dialect;
+  /**
+   * Emit the schema block — every table and view with its columns, index names and
+   * constraint names. Overrides config; defaults to `true`.
+   */
+  schema?: boolean;
 }
 
 export interface GenerateFailure {
@@ -100,6 +117,16 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   const catalog = await intro.catalog();
   const columnOverrides = parseColumnComments(await intro.columnComments());
   const writable = await intro.writableColumns();
+
+  // The schema block reuses the column comments, so a `@type`/`@notNull` declared once
+  // shapes a column the same way in the table listing and in every query selecting it.
+  const emitSchema = options.schema ?? config.schema ?? true;
+  const tables: EmitTable[] = emitSchema
+    ? (await intro.tables()).map((table) => ({
+        ...table,
+        columns: resolveTableColumns({ table, columnOverrides }),
+      }))
+    : [];
 
   // `writable` lets SET-clause neutralization self-assign a real column.
   const discover = createDiscoverer({ projectRoot: cwd, files: sourceFiles, writable, dialect });
@@ -167,6 +194,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   if (typed > 0) {
     const contents = emitModule({
       queries: emitModels,
+      tables,
       packageName: options.packageName ?? DEFAULT_PACKAGE,
     });
     if (safeRead(outPath) !== contents) {

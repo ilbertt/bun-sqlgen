@@ -14,6 +14,11 @@ discover sql.Name`...` tags (TS AST)
   → emit queries.gen.ts
 ```
 
+The same generated module carries a **schema block**: `Introspector.tables()` reports
+every relation with its columns, index names and constraint names, and those columns
+go through the same override resolution the result fields do — so a `COMMENT ON COLUMN`
+`@type` shapes a column identically in both. It's on unless `schema: false` is passed.
+
 The describe step runs against a dialect-specific introspector under `introspect/`,
 chosen by `dialect` (default `postgres`): **PGlite** for Postgres (`describeQuery`
 OIDs + `EXPLAIN VERBOSE` provenance) or **`bun:sqlite`** for SQLite (prepared-statement

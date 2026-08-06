@@ -24,6 +24,25 @@ export interface ResultField {
   tsNote?: string;
 }
 
+/** A base relation's column as the introspector reports it, before overrides. */
+export interface SchemaColumn extends ResultField {
+  notNull: boolean;
+}
+
+/**
+ * A base relation — table or view — with its columns and the names of its indexes
+ * and constraints. Generic over the column shape: the introspector fills it with
+ * `SchemaColumn`s, the emitter with the same `ResolvedField`s the queries use.
+ */
+export interface Table<Column> {
+  name: string;
+  columns: Column[];
+  indexes: string[];
+  constraints: string[];
+}
+
+export type SchemaTable = Table<SchemaColumn>;
+
 /**
  * Where an output column came from, traced through the plan. A `column` is a
  * base-table column (possibly on the nullable side of an outer join); anything
@@ -104,6 +123,8 @@ export interface EmitModel {
   resultFields: ResolvedField[];
 }
 
+export type EmitTable = Table<ResolvedField>;
+
 /** Which engine introspects the migrations at build time. Defaults to `postgres`. */
 export type Dialect = 'postgres' | 'sqlite';
 
@@ -117,6 +138,8 @@ export interface Introspector {
   columnComments: () => Promise<RawColumnComments>;
   /** Writable columns (not identity/generated), for SET-clause neutralization. */
   writableColumns: () => Promise<WritableColumns>;
+  /** Every base relation with its columns, index names and constraint names. */
+  tables: () => Promise<SchemaTable[]>;
   close: () => Promise<void>;
 }
 

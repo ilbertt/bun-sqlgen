@@ -65,6 +65,39 @@ import type { QueryResults } from '@ilbertt/bun-sqlgen';
 type User = QueryResults['GetUser']; // { id: string; email: string; display_name: string | null }
 ```
 
+## Your schema, as types
+
+The same generated file also describes **every table and view** your migrations
+create — its columns, and the names of its indexes and constraints. It's the schema
+the generator already had to read, so it costs nothing extra and covers tables no
+query happens to mention:
+
+```ts
+import type { DatabaseTables } from '@ilbertt/bun-sqlgen';
+
+type UserRow = DatabaseTables['users']['columns']; // { id: string; email: string; display_name: string | null }
+type UserIndex = DatabaseTables['users']['indexes']; // 'users_pkey' | 'users_email_idx'
+type UserConstraint = DatabaseTables['users']['constraints']; // 'users_pkey' | 'users_email_key'
+```
+
+Columns are typed and documented exactly as a query selecting them would be — same
+type mapping, same `NOT NULL`, same `COMMENT ON COLUMN` `@type` and JSDoc. The
+index/constraint unions make anything that names one — an `ON CONFLICT ON CONSTRAINT`,
+a migration helper, a drop script — checkable against the real schema. A relation with
+none gets `never`.
+
+Two things to know:
+
+- **Views and materialized views are included**, but their columns are all nullable:
+  neither engine tracks `NOT NULL` through a view definition. A *query* against a view
+  still gets precise nullability, because it traces columns back to their base tables.
+- **SQLite has no constraint catalog** — only explicitly named constraints
+  (`CONSTRAINT price_positive CHECK (…)`) are listed, since unnamed ones have no name
+  to report.
+
+Pass `--no-schema` (or `schema: false` in `sqlgen.config.ts`) to leave the block out
+and generate query types only.
+
 ### Inside transactions
 
 The client passed to a `begin`/`transaction`/`savepoint` callback is typed too, so a
@@ -139,6 +172,8 @@ stored text, not a `Date`).
 - **No column comments.** The schema-level overrides via `COMMENT ON COLUMN` are
   Postgres-only; the per-query `@notNull`/`@nullable`/`@type` pragmas work in both
   dialects.
+- **Constraint names are partial.** SQLite catalogues none, so the schema block lists
+  only the ones the DDL names explicitly. Index names are complete.
 
 A runnable example lives in the
 [`sqlite` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/sqlite).

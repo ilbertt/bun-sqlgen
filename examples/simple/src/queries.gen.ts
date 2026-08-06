@@ -91,8 +91,102 @@ export interface Queries {
     CountDeals: ICountDealsResult;
 }
 
+/** Columns of `deal_details`. */
+export interface IDealDetailsColumns {
+    deal_id: string | null;
+    status: string | null;
+    amount: string | null;
+    email: string | null;
+    display_name: string | null;
+    status_upper: string | null;
+}
+
+/** Schema of `deal_details`. */
+export interface IDealDetailsTable {
+    columns: IDealDetailsColumns;
+    indexes: never;
+    constraints: never;
+}
+
+/** Columns of `deal_meta`. */
+export interface IDealMetaColumns {
+    id: string;
+    deal_id: string;
+    stage: "lead" | "negotiation" | "won" | "lost";
+    tags: string[];
+    /** Free-form metadata captured during the deal. */
+    details: {
+        priority: number;
+        notes: string;
+    } | null;
+    scores: number[] | null;
+}
+
+/** Schema of `deal_meta`. */
+export interface IDealMetaTable {
+    columns: IDealMetaColumns;
+    indexes: "deal_meta_pkey";
+    constraints: "deal_meta_deal_id_fkey" | "deal_meta_pkey";
+}
+
+/** Columns of `deals`. */
+export interface IDealsColumns {
+    id: string;
+    user_id: string;
+    amount: string;
+    status: string;
+}
+
+/** Schema of `deals`. */
+export interface IDealsTable {
+    columns: IDealsColumns;
+    indexes: "deals_pkey";
+    constraints: "deals_pkey" | "deals_user_id_fkey";
+}
+
+/** Columns of `payments`. */
+export interface IPaymentsColumns {
+    id: string;
+    deal_id: string;
+    amount: string;
+    paid_at: Date;
+}
+
+/** Schema of `payments`. */
+export interface IPaymentsTable {
+    columns: IPaymentsColumns;
+    indexes: "payments_pkey";
+    constraints: "payments_deal_id_fkey" | "payments_pkey";
+}
+
+/** Columns of `users`. */
+export interface IUsersColumns {
+    id: string;
+    email: string;
+    display_name: string | null;
+    created_at: Date;
+    updated_at: Date;
+}
+
+/** Schema of `users`. */
+export interface IUsersTable {
+    columns: IUsersColumns;
+    indexes: "users_pkey";
+    constraints: "users_pkey";
+}
+
+export interface Tables {
+    deal_details: IDealDetailsTable;
+    deal_meta: IDealMetaTable;
+    deals: IDealsTable;
+    payments: IPaymentsTable;
+    users: IUsersTable;
+}
+
 declare module "@repo/bun-sqlgen" {
     interface QueryResults extends Queries {
+    }
+    interface DatabaseTables extends Tables {
     }
 }
 
