@@ -65,59 +65,6 @@ import type { QueryResults } from '@ilbertt/bun-sqlgen';
 type User = QueryResults['GetUser']; // { id: string; email: string; display_name: string | null }
 ```
 
-## Your schema, as types
-
-The same generated file also describes **every table and view** your migrations
-create — its columns, and the names of its indexes and constraints. It's the schema
-the generator already had to read, so it costs nothing extra and covers tables no
-query happens to mention:
-
-```ts
-import type { DatabaseTables } from '@ilbertt/bun-sqlgen';
-
-type UserRow = DatabaseTables['users']['columns']; // { id: string; email: string; display_name: string | null }
-type UserIndex = DatabaseTables['users']['indexes']; // 'users_pkey' | 'users_email_idx'
-type UserConstraint = DatabaseTables['users']['constraints']; // 'users_pkey' | 'users_email_key'
-```
-
-Columns are typed and documented exactly as a query selecting them would be — same
-type mapping, same `NOT NULL`, same `COMMENT ON COLUMN` `@type` and JSDoc. The
-index/constraint unions make anything that names one — an `ON CONFLICT ON CONSTRAINT`,
-a migration helper, a drop script — checkable against the real schema. A relation with
-none gets `never`.
-
-**The schema block is the source of truth for query types too.** A result field that
-traces back to a base column is emitted as a reference to it, not as a repeated type,
-so the column a field came from is visible on hover and in `tsc` errors:
-
-```ts
-export interface IListDealDetailsResult {
-    deal_id: IDealsColumns["id"];       // `d.id AS deal_id`, traced through a view
-    amount: IDealsColumns["amount"];
-    email: IUsersColumns["email"];
-    status_upper: string | null;        // an expression — no column to point at
-}
-```
-
-Nullability stays a per-query answer, since it depends on the query: a `NOT NULL`
-column pulled through a `LEFT JOIN` widens to `IDealsColumns["amount"] | null`, and a
-nullable one pinned by `@notNull` narrows to `NonNullable<IUsersColumns["display_name"]>`.
-Fields the generator can't trace to a column — expressions, aggregates, anything under
-a per-query `@type` — keep their own type inline, as does everything when the schema
-block is off.
-
-Two things to know:
-
-- **Views and materialized views are included**, but their columns are all nullable:
-  neither engine tracks `NOT NULL` through a view definition. A *query* against a view
-  still gets precise nullability, because it traces columns back to their base tables.
-- **SQLite has no constraint catalog** — only explicitly named constraints
-  (`CONSTRAINT price_positive CHECK (…)`) are listed, since unnamed ones have no name
-  to report.
-
-Pass `--no-schema` (or `schema: false` in `sqlgen.config.ts`) to leave the block out
-and generate query types only.
-
 ### Inside transactions
 
 The client passed to a `begin`/`transaction`/`savepoint` callback is typed too, so a
@@ -132,6 +79,24 @@ await sql.begin(async (tx) => {
   return order; // order.total is typed
 });
 ```
+
+## Schema types
+
+The generated file also describes every table and view — its columns, and the names of
+its indexes and constraints:
+
+```ts
+import type { DatabaseTables } from '@ilbertt/bun-sqlgen';
+
+type UserRow = DatabaseTables['users']['columns'];
+type UserIndex = DatabaseTables['users']['indexes']; // 'users_pkey' | 'users_email_idx'
+```
+
+Columns are typed like the query results are, and a result field that traces to a base
+column references it (`email: IUsersColumns['email']`) rather than repeating its type.
+View columns are all nullable — nothing tracks `NOT NULL` through a view definition.
+
+`--no-schema` (or `schema: false` in `sqlgen.config.ts`) leaves the block out.
 
 ## CLI
 
@@ -301,12 +266,6 @@ default**. A column comment sets the column's *base* nullability, so outer-join
 widening still applies on top (a `@notNull` column pulled through a `LEFT JOIN` is
 still nullable in that query). Only the `@…` tokens are read for behavior; the
 rest of the comment is carried through as documentation.
-
-This reaches **generated columns**, which are the main reason to comment one: a
-`GENERATED … VIRTUAL` column arrives as the expression that generates it
-(`lower(u.email)`), not as a column, so its comment is matched by relation and name
-rather than by provenance. That works even when several tables in the query comment the
-same column name — the expression names the alias it reads from, so the right table wins.
 
 ## Boundaries
 
