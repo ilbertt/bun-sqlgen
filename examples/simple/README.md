@@ -12,7 +12,10 @@ workspace name the example imports from (real projects use the default
 
 The tail of `src/index.ts` uses the schema block the same file carries: `DatabaseTables`
 types a `deals` row and pins the index/constraint names, with `@ts-expect-error` on a
-column and an index name that don't exist.
+column and an index name that don't exist. The result interfaces reference that block
+rather than repeating types — `ListDealDetails.deal_id` is `IDealsColumns['id']` even
+though the query selects it through a view — and `NamedUsers` shows a `@notNull` pragma
+narrowing a schema-nullable column to `NonNullable<…>`.
 
 Editing a query and running `codegen` is all it takes; misusing a result type
 (`row.whatever`, `row.display_name.length` on a nullable column) becomes a `tsc`

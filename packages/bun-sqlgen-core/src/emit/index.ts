@@ -5,6 +5,7 @@ import {
   registryInterface,
   resultInterface,
   schemaDeclarations,
+  schemaIndex,
 } from '#emit/declarations.ts';
 import type { EmitModel, EmitTable } from '#types.ts';
 
@@ -34,10 +35,11 @@ export function emitModule(input: {
   tables: EmitTable[];
   packageName: string;
 }): string {
+  const schema = schemaIndex(input.tables);
   const statements: ts.Statement[] = [
-    ...input.queries.map(resultInterface),
+    ...input.queries.map((query) => resultInterface({ query, schema })),
     registryInterface(input.queries),
-    ...schemaDeclarations(input.tables),
+    ...schemaDeclarations({ tables: input.tables, schema }),
     augmentation({ packageName: input.packageName, withSchema: input.tables.length > 0 }),
   ];
   return `${HEADER}\n${statements.map(printNode).join('\n\n')}\n\nexport {};\n`;

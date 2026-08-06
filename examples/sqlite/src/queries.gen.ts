@@ -3,31 +3,31 @@
 
 /** Result of query `ListDeals`. */
 export interface IListDealsResult {
-    id: number;
-    status: string;
-    amount: number;
-    is_active: number;
+    id: IDealsColumns["id"];
+    status: IDealsColumns["status"];
+    amount: IDealsColumns["amount"];
+    is_active: IDealsColumns["is_active"];
 }
 
 /** Result of query `GetDeal`. */
 export interface IGetDealResult {
-    id: number;
-    amount: number;
-    attachment: Uint8Array | null;
-    closed_at: string | null;
+    id: IDealsColumns["id"];
+    amount: IDealsColumns["amount"];
+    attachment: IDealsColumns["attachment"];
+    closed_at: IDealsColumns["closed_at"];
 }
 
 /** Result of query `GetUserDeals`. */
 export interface IGetUserDealsResult {
     id: number | null;
-    email: string | null;
-    amount: number | null;
+    email: IUsersColumns["email"] | null;
+    amount: IDealsColumns["amount"] | null;
 }
 
 /** Result of query `UserEmails`. */
 export interface IUserEmailsResult {
-    email: string;
-    amount: number | null;
+    email: IUsersColumns["email"];
+    amount: IDealsColumns["amount"] | null;
 }
 
 /** Result of query `DealStats`. */
@@ -38,9 +38,9 @@ export interface IDealStatsResult {
 
 /** Result of query `SearchDeals`. */
 export interface ISearchDealsResult {
-    id: number;
-    status: string;
-    amount: number;
+    id: IDealsColumns["id"];
+    status: IDealsColumns["status"];
+    amount: IDealsColumns["amount"];
 }
 
 export interface Queries {

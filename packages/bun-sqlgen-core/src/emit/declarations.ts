@@ -32,8 +32,75 @@ function docComment(input: { node: ts.Node; text: string }): void {
   );
 }
 
-function fieldSignature(field: ResolvedField): ts.PropertySignature {
-  const type = typeNode(field.nullable ? `${field.ts} | null` : field.ts);
+/**
+ * The emitted schema block, keyed by relation name: the interface each one's columns
+ * landed in, and those columns by name. Result fields look themselves up here to
+ * reference their source column instead of repeating its type.
+ */
+export type SchemaIndex = Map<string, { base: string; columns: Map<string, ResolvedField> }>;
+
+export function schemaIndex(tables: EmitTable[]): SchemaIndex {
+  const bases = uniqueBases(tables);
+  return new Map(
+    tables.map((table) => [
+      table.name,
+      {
+        base: bases.get(table.name)!,
+        columns: new Map(table.columns.map((column) => [column.name, column])),
+      },
+    ]),
+  );
+}
+
+/**
+ * A field's type as a reference into the schema block — `IUsersColumns['email']` — so
+ * the column it came from travels with the type instead of being flattened away. Only
+ * when the two agree on the type: a per-query `@type`, or a column the dialect
+ * describes differently in a query than in the catalog, keeps its own.
+ */
+function columnReference(input: {
+  field: ResolvedField;
+  schema: SchemaIndex | undefined;
+}): { node: ts.TypeNode; nullable: boolean } | null {
+  const { field, schema } = input;
+  const relation = field.source && schema?.get(field.source.table);
+  const column = relation?.columns.get(field.source!.column);
+  if (!relation || !column || column.ts !== field.ts) {
+    return null;
+  }
+  return {
+    node: f.createIndexedAccessTypeNode(
+      f.createTypeReferenceNode(columnsName(relation.base)),
+      f.createLiteralTypeNode(f.createStringLiteral(field.source!.column)),
+    ),
+    nullable: column.nullable,
+  };
+}
+
+// Nullability stays a per-query answer, so the reference is widened where an outer join
+// made the column nullable and narrowed where a `@notNull` pragma pinned it.
+function fieldType(input: { field: ResolvedField; schema: SchemaIndex | undefined }): ts.TypeNode {
+  const { field } = input;
+  const ref = columnReference(input);
+  if (!ref) {
+    return typeNode(field.nullable ? `${field.ts} | null` : field.ts);
+  }
+  if (ref.nullable === field.nullable) {
+    return ref.node;
+  }
+  return field.nullable
+    ? f.createUnionTypeNode([ref.node, f.createLiteralTypeNode(f.createNull())])
+    : f.createTypeReferenceNode('NonNullable', [ref.node]);
+}
+
+// `schema` is left out for the schema block's own columns — they are what everything
+// else points at, so they carry the resolved type itself.
+function fieldSignature(input: {
+  field: ResolvedField;
+  schema?: SchemaIndex;
+}): ts.PropertySignature {
+  const { field } = input;
+  const type = fieldType({ field, schema: input.schema });
   const sig = f.createPropertySignature(undefined, propertyName(field.name), undefined, type);
   // The source column's comment prose, ported as JSDoc.
   if (field.doc) {
@@ -60,15 +127,19 @@ function fieldSignature(field: ResolvedField): ts.PropertySignature {
 // bundling) — TypeScript dereferences `QueryResults['Name']` to this interface and
 // errors (TS4053) if it can't name it. `QueryResults['Name']` is still the intended
 // access path; the export just keeps the underlying name reachable.
-export function resultInterface(q: EmitModel): ts.InterfaceDeclaration {
+export function resultInterface(input: {
+  query: EmitModel;
+  schema: SchemaIndex;
+}): ts.InterfaceDeclaration {
+  const { query } = input;
   const node = f.createInterfaceDeclaration(
     [exported()],
-    resultName(q.name),
+    resultName(query.name),
     undefined,
     undefined,
-    q.resultFields.map(fieldSignature),
+    query.resultFields.map((field) => fieldSignature({ field, schema: input.schema })),
   );
-  docComment({ node, text: `Result of query \`${q.name}\`.` });
+  docComment({ node, text: `Result of query \`${query.name}\`.` });
   return node;
 }
 
@@ -128,19 +199,22 @@ function uniqueBases(tables: EmitTable[]): Map<string, string> {
  * its index and constraint names, both collected into an exported `Tables` registry.
  * Empty when the schema block is turned off.
  */
-export function schemaDeclarations(tables: EmitTable[]): ts.Statement[] {
-  const bases = uniqueBases(tables);
+export function schemaDeclarations(input: {
+  tables: EmitTable[];
+  schema: SchemaIndex;
+}): ts.Statement[] {
+  const { tables, schema } = input;
   const statements: ts.Statement[] = [];
 
   for (const table of tables) {
-    const base = bases.get(table.name)!;
+    const base = schema.get(table.name)!.base;
 
     const columns = f.createInterfaceDeclaration(
       [exported()],
       columnsName(base),
       undefined,
       undefined,
-      table.columns.map(fieldSignature),
+      table.columns.map((field) => fieldSignature({ field })),
     );
     docComment({ node: columns, text: `Columns of \`${table.name}\`.` });
     statements.push(columns);
@@ -185,7 +259,7 @@ export function schemaDeclarations(tables: EmitTable[]): ts.Statement[] {
           undefined,
           propertyName(table.name),
           undefined,
-          f.createTypeReferenceNode(tableName(bases.get(table.name)!)),
+          f.createTypeReferenceNode(tableName(schema.get(table.name)!.base)),
         ),
       ),
     ),

@@ -100,6 +100,12 @@ export type NullabilityReason =
   | 'unresolved'
   | 'expr';
 
+/** The base column a result field traces back to. */
+export interface ColumnSource {
+  table: string;
+  column: string;
+}
+
 export interface ResolvedField {
   name: string;
   ts: string;
@@ -108,6 +114,12 @@ export interface ResolvedField {
   note?: string;
   /** The source column's comment prose, emitted as the field's JSDoc. */
   doc?: string;
+  /**
+   * Set when the field traces to a base column and takes that column's type — the
+   * emitter points at the schema block instead of repeating the type. Left unset by a
+   * per-query `@type`, whose whole point is to override what the column says.
+   */
+  source?: ColumnSource;
 }
 
 export interface DiscoveredQuery {

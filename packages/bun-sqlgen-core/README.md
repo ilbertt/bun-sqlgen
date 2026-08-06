@@ -19,6 +19,14 @@ every relation with its columns, index names and constraint names, and those col
 go through the same override resolution the result fields do — so a `COMMENT ON COLUMN`
 `@type` shapes a column identically in both. It's on unless `schema: false` is passed.
 
+The nullability step already resolves each result field to its base column (that's how
+it finds the catalog entry), so it keeps that `source` on the `ResolvedField` and the
+emitter turns it into a reference — `IUsersColumns['email']` instead of a repeated
+`string`. Only when both agree on the type; a per-query `@type` deliberately leaves
+`source` unset. Nullability is composed on top per query (`| null` for outer-join
+widening, `NonNullable<…>` for a `@notNull` pragma), because it isn't a property of
+the column alone.
+
 The describe step runs against a dialect-specific introspector under `introspect/`,
 chosen by `dialect` (default `postgres`): **PGlite** for Postgres (`describeQuery`
 OIDs + `EXPLAIN VERBOSE` provenance) or **`bun:sqlite`** for SQLite (prepared-statement

@@ -2,6 +2,7 @@ import type {
   Catalog,
   ColumnOverride,
   ColumnOverrides,
+  ColumnSource,
   DescribeResult,
   NullabilityReason,
   Overrides,
@@ -94,7 +95,15 @@ export function resolveFields(input: {
       reason = 'expr';
     }
 
-    return { name: f.name, ts, nullable, reason, note, doc: comment?.doc };
+    return {
+      name: f.name,
+      ts,
+      nullable,
+      reason,
+      note,
+      doc: comment?.doc,
+      source: source ?? undefined,
+    };
   });
 }
 
@@ -140,7 +149,7 @@ function commentByName(input: {
 function resolveSource(input: {
   prov: Provenance | undefined;
   catalog: Catalog;
-}): { table: string; column: string } | null {
+}): ColumnSource | null {
   const { prov, catalog } = input;
   if (prov?.kind !== 'column') {
     return null;

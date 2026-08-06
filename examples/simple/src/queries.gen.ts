@@ -3,26 +3,26 @@
 
 /** Result of query `GetUserDeals`. */
 export interface IGetUserDealsResult {
-    id: string;
-    email: string;
-    display_name: string | null;
-    amount: string | null;
-    updated_at: Date;
+    id: IUsersColumns["id"];
+    email: IUsersColumns["email"];
+    display_name: IUsersColumns["display_name"];
+    amount: IDealsColumns["amount"] | null;
+    updated_at: IUsersColumns["updated_at"];
 }
 
 /** Result of query `ListDeals`. */
 export interface IListDealsResult {
-    id: string;
-    status: string;
-    amount: string;
+    id: IDealsColumns["id"];
+    status: IDealsColumns["status"];
+    amount: IDealsColumns["amount"];
 }
 
 /** Result of query `GetDealSummaries`. */
 export interface IGetDealSummariesResult {
-    id: string;
-    status: string;
-    email: string;
-    deal_amount: string;
+    id: IDealsColumns["id"];
+    status: IDealsColumns["status"];
+    email: IUsersColumns["email"];
+    deal_amount: IDealsColumns["amount"];
     total_paid: string | null;
     payment_count: string | null;
     fully_paid: boolean | null;
@@ -30,53 +30,53 @@ export interface IGetDealSummariesResult {
 
 /** Result of query `ListDealDetails`. */
 export interface IListDealDetailsResult {
-    deal_id: string;
-    status: string;
-    amount: string;
-    email: string;
-    display_name: string | null;
+    deal_id: IDealsColumns["id"];
+    status: IDealsColumns["status"];
+    amount: IDealsColumns["amount"];
+    email: IUsersColumns["email"];
+    display_name: IUsersColumns["display_name"];
     status_upper: string | null;
 }
 
 /** Result of query `SearchDeals`. */
 export interface ISearchDealsResult {
-    id: string;
-    status: string;
-    amount: string;
+    id: IDealsColumns["id"];
+    status: IDealsColumns["status"];
+    amount: IDealsColumns["amount"];
 }
 
 /** Result of query `RecentDeals`. */
 export interface IRecentDealsResult {
-    id: string;
-    status: string;
+    id: IDealsColumns["id"];
+    status: IDealsColumns["status"];
 }
 
 /** Result of query `GetDealMeta`. */
 export interface IGetDealMetaResult {
-    id: string;
-    stage: "lead" | "negotiation" | "won" | "lost";
-    tags: string[];
+    id: IDealMetaColumns["id"];
+    stage: IDealMetaColumns["stage"];
+    tags: IDealMetaColumns["tags"];
     /** Free-form metadata captured during the deal. */
-    details: {
-        priority: number;
-        notes: string;
-    } | null;
-    scores: number[] | null;
+    details: IDealMetaColumns["details"];
+    scores: IDealMetaColumns["scores"];
 }
 
 /** Result of query `GetDealDetails`. */
 export interface IGetDealDetailsResult {
-    id: string;
+    id: IDealMetaColumns["id"];
     /** Free-form metadata captured during the deal. */
-    details: {
-        priority: number;
-        notes: string;
-    } | null;
+    details: IDealMetaColumns["details"];
 }
 
 /** Result of query `CountDeals`. */
 export interface ICountDealsResult {
     total: string | null;
+}
+
+/** Result of query `NamedUsers`. */
+export interface INamedUsersResult {
+    id: IUsersColumns["id"];
+    display_name: NonNullable<IUsersColumns["display_name"]>;
 }
 
 export interface Queries {
@@ -89,6 +89,7 @@ export interface Queries {
     GetDealMeta: IGetDealMetaResult;
     GetDealDetails: IGetDealDetailsResult;
     CountDeals: ICountDealsResult;
+    NamedUsers: INamedUsersResult;
 }
 
 /** Columns of `deal_details`. */

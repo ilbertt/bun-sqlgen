@@ -3,21 +3,21 @@
 
 /** Result of query `GetArticle`. */
 export interface IGetArticleResult {
-    id: string;
+    id: IArticlesColumns["id"];
     /** Case-insensitive URL slug. */
-    slug: string;
-    title: string;
-    body: string | null;
-    created_by: string;
+    slug: IArticlesColumns["slug"];
+    title: IArticlesColumns["title"];
+    body: IArticlesColumns["body"];
+    created_by: IArticlesColumns["created_by"];
 }
 
 /** Result of query `ListArticlesWithAuthor`. */
 export interface IListArticlesWithAuthorResult {
-    id: string;
-    title: string;
+    id: IArticlesColumns["id"];
+    title: IArticlesColumns["title"];
     /** Case-insensitive contact address. */
-    email: string | null;
-    name: string | null;
+    email: IAuthorsColumns["email"] | null;
+    name: IAuthorsColumns["name"] | null;
 }
 
 export interface Queries {

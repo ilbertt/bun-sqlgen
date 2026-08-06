@@ -86,6 +86,26 @@ index/constraint unions make anything that names one — an `ON CONFLICT ON CONS
 a migration helper, a drop script — checkable against the real schema. A relation with
 none gets `never`.
 
+**The schema block is the source of truth for query types too.** A result field that
+traces back to a base column is emitted as a reference to it, not as a repeated type,
+so the column a field came from is visible on hover and in `tsc` errors:
+
+```ts
+export interface IListDealDetailsResult {
+    deal_id: IDealsColumns["id"];       // `d.id AS deal_id`, traced through a view
+    amount: IDealsColumns["amount"];
+    email: IUsersColumns["email"];
+    status_upper: string | null;        // an expression — no column to point at
+}
+```
+
+Nullability stays a per-query answer, since it depends on the query: a `NOT NULL`
+column pulled through a `LEFT JOIN` widens to `IDealsColumns["amount"] | null`, and a
+nullable one pinned by `@notNull` narrows to `NonNullable<IUsersColumns["display_name"]>`.
+Fields the generator can't trace to a column — expressions, aggregates, anything under
+a per-query `@type` — keep their own type inline, as does everything when the schema
+block is off.
+
 Two things to know:
 
 - **Views and materialized views are included**, but their columns are all nullable:
