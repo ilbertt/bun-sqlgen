@@ -1,6 +1,7 @@
 import type { DatabaseTables } from '@repo/bun-sqlgen';
 import { withTypes } from '@repo/bun-sqlgen';
 import { SQL } from 'bun';
+import { schema } from '#queries.gen.ts';
 
 const sql = withTypes(new SQL(Bun.env.DATABASE_URL ?? 'postgres://localhost/example'));
 
@@ -142,3 +143,14 @@ const optional = await sql.OptionalSearchKeys`
   SELECT d.search_key FROM users u LEFT JOIN deals d ON d.user_id = u.id
 `;
 console.log(optional[0]?.search_key?.length); // string | null
+
+// The schema lands as values too, so a name is usable at runtime and not only in a
+// type — and both come from the same emit, so they can't drift.
+console.log(schema.users.columns.join(', ')); // id, email, display_name, created_at, ...
+const pk: DatabaseTables['users']['constraints'] = schema.users.constraints[0];
+console.log(pk); // 'users_pkey'
+
+// A view has no indexes, so its union is `never` and nothing can be assigned to it.
+// @ts-expect-error — `deal_details` is a view
+const noIndex: DatabaseTables['deal_details']['indexes'] = 'anything';
+console.log(noIndex);

@@ -64,8 +64,8 @@ export interface IDealDetailsColumns {
 /** Schema of `deal_details`. */
 export interface IDealDetailsTable {
     columns: IDealDetailsColumns;
-    indexes: never;
-    constraints: never;
+    indexes: (typeof schema)["deal_details"]["indexes"][number];
+    constraints: (typeof schema)["deal_details"]["constraints"][number];
 }
 
 /** Columns of `deals`. */
@@ -82,8 +82,8 @@ export interface IDealsColumns {
 /** Schema of `deals`. */
 export interface IDealsTable {
     columns: IDealsColumns;
-    indexes: never;
-    constraints: never;
+    indexes: (typeof schema)["deals"]["indexes"][number];
+    constraints: (typeof schema)["deals"]["constraints"][number];
 }
 
 /** Columns of `users`. */
@@ -97,9 +97,15 @@ export interface IUsersColumns {
 /** Schema of `users`. */
 export interface IUsersTable {
     columns: IUsersColumns;
-    indexes: never;
-    constraints: never;
+    indexes: (typeof schema)["users"]["indexes"][number];
+    constraints: (typeof schema)["users"]["constraints"][number];
 }
+
+export const schema = {
+    deal_details: { name: "deal_details", columns: ["deal_id", "status", "amount", "email", "display_name"], indexes: [], constraints: [] },
+    deals: { name: "deals", columns: ["id", "user_id", "amount", "status", "is_active", "closed_at", "attachment"], indexes: [], constraints: [] },
+    users: { name: "users", columns: ["id", "email", "display_name", "created_at"], indexes: [], constraints: [] }
+} as const;
 
 export interface Tables {
     deal_details: IDealDetailsTable;

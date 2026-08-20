@@ -19,6 +19,11 @@ every relation with its columns, index names and constraint names, and those col
 go through the same override resolution the result fields do — so a `COMMENT ON COLUMN`
 `@type` shapes a column identically in both. It's on unless `schema: false` is passed.
 
+The names go out twice over: once as the `schema` const, and once as the literal unions
+on each table interface — which are *derived* from that const
+(`(typeof schema)['users']['indexes'][number]`) rather than repeated, so every name
+appears in the emitted module exactly once.
+
 The nullability step already resolves each result field to its base column (that's how
 it finds the catalog entry), so it keeps that `source` on the `ResolvedField` and the
 emitter turns it into a reference — `IUsersColumns['email']` instead of a repeated

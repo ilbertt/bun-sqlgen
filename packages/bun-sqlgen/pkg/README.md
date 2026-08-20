@@ -92,6 +92,15 @@ type UserRow = DatabaseTables['users']['columns'];
 type UserIndex = DatabaseTables['users']['indexes']; // 'users_pkey' | 'users_email_idx'
 ```
 
+The names are also emitted as values, for the places one is needed at runtime:
+
+```ts
+import { schema } from './queries.gen.ts';
+
+schema.users.columns; // ['id', 'email', 'display_name']
+schema.users.constraints; // ['users_pkey', 'users_email_key']
+```
+
 Columns are typed like the query results are, and a result field that traces to a base
 column references it (`email: IUsersColumns['email']`) rather than repeating its type.
 View columns are all nullable — nothing tracks `NOT NULL` through a view definition.

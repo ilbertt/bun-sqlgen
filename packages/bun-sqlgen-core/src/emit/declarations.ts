@@ -17,6 +17,8 @@ import type { EmitModel, EmitTable, ResolvedField } from '#types.ts';
 const REGISTRY = 'Queries';
 const GLOBAL_REGISTRY = 'QueryResults';
 const TABLE_REGISTRY = 'Tables';
+// The runtime half of the schema block: the same names, as values.
+const SCHEMA_VALUE = 'schema';
 const GLOBAL_TABLE_REGISTRY = 'DatabaseTables';
 
 function exported(): ts.Modifier {
@@ -164,12 +166,55 @@ export function registryInterface(queries: EmitModel[]): ts.InterfaceDeclaration
   );
 }
 
-// A union of the given names, or `never` when the relation has none.
-function stringUnion(names: string[]): ts.TypeNode {
-  if (names.length === 0) {
-    return f.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword);
-  }
-  return f.createUnionTypeNode(names.map((n) => f.createLiteralTypeNode(f.createStringLiteral(n))));
+const stringArray = (names: string[]): ts.Expression =>
+  f.createArrayLiteralExpression(names.map((n) => f.createStringLiteral(n)));
+
+// `(typeof schema)["users"]["indexes"][number]` — the union read back off the emitted
+// const rather than repeated, so each name appears in the module exactly once. An empty
+// `readonly []` indexes to `never`, which is what a relation with none should give.
+function namesUnion(input: { table: string; key: string }): ts.TypeNode {
+  const at = (member: { object: ts.TypeNode; key: string }): ts.TypeNode =>
+    f.createIndexedAccessTypeNode(
+      member.object,
+      f.createLiteralTypeNode(f.createStringLiteral(member.key)),
+    );
+  const entry = at({
+    object: f.createTypeQueryNode(f.createIdentifier(SCHEMA_VALUE)),
+    key: input.table,
+  });
+  return f.createIndexedAccessTypeNode(
+    at({ object: entry, key: input.key }),
+    f.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+  );
+}
+
+/**
+ * `export const schema = { users: { name, columns, indexes, constraints } } as const` —
+ * the schema as values, for the places a name is needed at runtime rather than in a
+ * type: an `ON CONFLICT ON CONSTRAINT`, a dynamic column list, migration tooling.
+ */
+function schemaValue(tables: EmitTable[]): ts.VariableStatement {
+  const entry = (table: EmitTable): ts.Expression =>
+    f.createObjectLiteralExpression([
+      f.createPropertyAssignment('name', f.createStringLiteral(table.name)),
+      f.createPropertyAssignment('columns', stringArray(table.columns.map((c) => c.name))),
+      f.createPropertyAssignment('indexes', stringArray(table.indexes)),
+      f.createPropertyAssignment('constraints', stringArray(table.constraints)),
+    ]);
+  const literal = f.createObjectLiteralExpression(
+    tables.map((table) => f.createPropertyAssignment(propertyName(table.name), entry(table))),
+    true,
+  );
+  const declaration = f.createVariableDeclaration(
+    SCHEMA_VALUE,
+    undefined,
+    undefined,
+    f.createAsExpression(literal, f.createTypeReferenceNode('const')),
+  );
+  return f.createVariableStatement(
+    [exported()],
+    f.createVariableDeclarationList([declaration], ts.NodeFlags.Const),
+  );
 }
 
 // Pascal-casing table names isn't injective, so a base that's already taken gets a
@@ -231,12 +276,17 @@ export function schemaDeclarations(input: {
           undefined,
           f.createTypeReferenceNode(columnsName(base)),
         ),
-        f.createPropertySignature(undefined, 'indexes', undefined, stringUnion(table.indexes)),
+        f.createPropertySignature(
+          undefined,
+          'indexes',
+          undefined,
+          namesUnion({ table: table.name, key: 'indexes' }),
+        ),
         f.createPropertySignature(
           undefined,
           'constraints',
           undefined,
-          stringUnion(table.constraints),
+          namesUnion({ table: table.name, key: 'constraints' }),
         ),
       ],
     );
@@ -248,6 +298,7 @@ export function schemaDeclarations(input: {
     return statements;
   }
 
+  statements.push(schemaValue(tables));
   statements.push(
     f.createInterfaceDeclaration(
       [exported()],
