@@ -67,15 +67,18 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
   }
 
   // Per-column NOT NULL — the piece describeQuery can't give us.
+  // Relation and column names come from the schema, and `__proto__` is a legal one:
+  // on an ordinary object it is the prototype accessor, so `map[name] ??= …` never
+  // assigns and the later `.push`/lookup fails. A null-prototype record has no such key.
   async function catalog(): Promise<Catalog> {
     const r = await db.query<CatalogRow>(`
       SELECT table_name, column_name, (is_nullable = 'NO') AS not_null
       FROM information_schema.columns
       WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
     `);
-    const map: Catalog = {};
+    const map: Catalog = Object.create(null);
     for (const row of r.rows) {
-      map[row.table_name] ??= {};
+      map[row.table_name] ??= Object.create(null);
       map[row.table_name]![row.column_name] = row.not_null;
     }
     return map;
@@ -92,9 +95,9 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE d.objsubid > 0 AND n.nspname NOT IN ('pg_catalog', 'information_schema')
     `);
-    const map: RawColumnComments = {};
+    const map: RawColumnComments = Object.create(null);
     for (const row of r.rows) {
-      map[row.table_name] ??= {};
+      map[row.table_name] ??= Object.create(null);
       map[row.table_name]![row.column_name] = row.description;
     }
     return map;
@@ -110,7 +113,7 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
         AND is_identity = 'NO' AND is_generated = 'NEVER'
       ORDER BY table_name, ordinal_position
     `);
-    const map: WritableColumns = {};
+    const map: WritableColumns = Object.create(null);
     for (const row of r.rows) {
       map[row.table_name] ??= [];
       map[row.table_name]!.push(row.column_name);
@@ -415,6 +418,9 @@ function analyzePlan(input: { plan: PlanNode; fieldCount: number }): {
 }
 
 const QUALIFIED_REF = /\b([a-zA-Z_][\w$]*)\.[a-zA-Z_][\w$]*/g;
+// A quoted literal can hold anything that looks like `alias.column` (`'u.email'::text`),
+// so it is blanked before the scan rather than read as a reference.
+const SQL_STRING = /'(?:[^']|'')*'/g;
 
 /**
  * The relation an expression reads from, when all of its inputs agree on one.
@@ -428,15 +434,17 @@ function expressionOrigin(input: {
   aliasToRel: Record<string, string>;
   nullableAliases: Set<string>;
 }): { relation?: string; outerNullable: boolean } {
-  const aliases = [...new Set([...input.expr.matchAll(QUALIFIED_REF)].map((m) => m[1]!))].filter(
+  const scanned = input.expr.replace(SQL_STRING, "''");
+  const aliases = [...new Set([...scanned.matchAll(QUALIFIED_REF)].map((m) => m[1]!))].filter(
     (alias) => alias in input.aliasToRel,
   );
+  // Whether any input is on the nullable side is knowable even when the inputs span
+  // several relations — and it has to be reported, or a comment matched by name alone
+  // would type an outer-joined column as non-null.
+  const outerNullable = aliases.some((alias) => input.nullableAliases.has(alias));
   const relations = [...new Set(aliases.map((alias) => input.aliasToRel[alias]!))];
   if (relations.length !== 1) {
-    return { outerNullable: false };
+    return { outerNullable };
   }
-  return {
-    relation: relations[0],
-    outerNullable: aliases.some((alias) => input.nullableAliases.has(alias)),
-  };
+  return { relation: relations[0], outerNullable };
 }

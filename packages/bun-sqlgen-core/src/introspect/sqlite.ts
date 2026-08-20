@@ -90,13 +90,16 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
     }
   }
 
+  // Relation and column names come from the schema, and `__proto__` is a legal one:
+  // on an ordinary object it is the prototype accessor, so `map[name] ??= …` never
+  // assigns and the later `.push`/lookup fails. A null-prototype record has no such key.
   // Per-column NOT NULL, from `PRAGMA table_info`. An `INTEGER PRIMARY KEY` is a
   // rowid alias and implicitly NOT NULL even when `notnull` reads 0.
   function catalog(): Promise<Catalog> {
-    const map: Catalog = {};
+    const map: Catalog = Object.create(null);
     for (const { name: table } of listRelations(['table', 'view'])) {
       const cols = db.prepare(`PRAGMA table_info(${quoteIdent(table)})`).all() as TableInfoRow[];
-      map[table] = {};
+      map[table] = Object.create(null);
       for (const c of cols) {
         map[table]![c.name] = c.notnull === 1 || (c.pk > 0 && /INT/i.test(c.type));
       }
@@ -113,7 +116,7 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
   // Writable columns (not generated) for `SET col = col` neutralization. `hidden`
   // from `table_xinfo`: 0 = ordinary, 2 = VIRTUAL, 3 = STORED generated column.
   function writableColumns(): Promise<WritableColumns> {
-    const map: WritableColumns = {};
+    const map: WritableColumns = Object.create(null);
     for (const { name: table } of listRelations(['table'])) {
       const cols = db.prepare(`PRAGMA table_xinfo(${quoteIdent(table)})`).all() as TableXInfoRow[];
       map[table] = cols.filter((c) => c.hidden === 0).map((c) => c.name);
@@ -132,10 +135,11 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
       const indexes = db
         .prepare(`PRAGMA index_list(${quoteIdent(rel.name)})`)
         .all() as IndexListRow[];
+      // SQLite has only these two; `sqlite_master.type` is already filtered to them.
+      const kind = rel.type === 'view' ? 'view' : 'table';
       return {
         name: rel.name,
-        // SQLite has only these two; `sqlite_master.type` is already filtered to them.
-        kind: rel.type === 'view' ? 'view' : 'table',
+        kind,
         columns: cols
           .filter((c) => c.hidden !== 1)
           .map((c) => {
@@ -150,7 +154,8 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
         // Sorted, as Postgres' catalog queries are: the emitted unions read the same
         // way in both dialects, and `--check-stale` never sees incidental reordering.
         indexes: indexes.map((i) => i.name).sort(),
-        constraints: parseConstraintNames(rel.sql ?? '').sort(),
+        // A view has no constraints to name, whatever its body happens to contain.
+        constraints: kind === 'table' ? parseConstraintNames(rel.sql ?? '').sort() : [],
       };
     });
     return Promise.resolve(out);
@@ -232,12 +237,16 @@ function parseRelations(sql: string): string[] {
 }
 
 const CONSTRAINT_NAME = new RegExp(String.raw`\bCONSTRAINT\s+(${IDENT})`, 'gi');
+// `sqlite_master.sql` is the statement as written, comments and literals included, and
+// any of those can contain the word CONSTRAINT. Blank them before scanning.
+const DDL_NOISE = /--[^\n]*|\/\*[\s\S]*?\*\/|'(?:[^']|'')*'/g;
 
 // SQLite keeps no catalog of constraint names — only the `CREATE TABLE` text has them.
 // So explicitly named constraints are read from the DDL; the unnamed ones (a bare
 // `PRIMARY KEY` / `CHECK (…)`, every foreign key) have no name to report at all.
 function parseConstraintNames(ddl: string): string[] {
-  return [...new Set([...ddl.matchAll(CONSTRAINT_NAME)].map((m) => unquoteIdent(m[1]!)))];
+  const scanned = ddl.replace(DDL_NOISE, ' ');
+  return [...new Set([...scanned.matchAll(CONSTRAINT_NAME)].map((m) => unquoteIdent(m[1]!)))];
 }
 
 function unquoteIdent(s: string): string {

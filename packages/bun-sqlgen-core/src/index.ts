@@ -19,7 +19,6 @@ export type {
   ResultField,
   SchemaColumn,
   SchemaTable,
-  Table,
   TypeCatalog,
   TypeInfo,
   WritableColumns,

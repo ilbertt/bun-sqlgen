@@ -9,6 +9,7 @@ import type {
   Provenance,
   RawColumnComments,
   ResolvedField,
+  ResultField,
   SchemaTable,
 } from '#types.ts';
 
@@ -59,9 +60,7 @@ export function resolveFields(input: {
     }
 
     // Type: column-comment `@type` > the introspector's resolved type.
-    const tsType = comment?.tsType;
-    const ts = tsType ?? f.ts;
-    const note = tsType ? undefined : f.tsNote;
+    const { ts, note } = commentType({ base: f, comment });
 
     let nullable: boolean;
     let reason: NullabilityReason;
@@ -74,12 +73,10 @@ export function resolveFields(input: {
     } else if (source && prov?.kind === 'column') {
       // A column comment sets the base nullability (catalog otherwise); outer-join
       // widening still applies on top.
-      const baseNotNull =
-        comment?.notNull === true
-          ? true
-          : comment?.nullable === true
-            ? false
-            : catalog[source.table]?.[source.column] === true;
+      const baseNotNull = commentNotNull({
+        comment,
+        fallback: catalog[source.table]?.[source.column] === true,
+      });
       nullable = !baseNotNull || prov.outerNullable;
       reason =
         comment?.notNull || comment?.nullable
@@ -128,18 +125,41 @@ export function resolveTableColumns(input: {
   const overrides = input.columnOverrides[input.table.name] ?? {};
   return input.table.columns.map((column): ResolvedField => {
     const comment = overrides[column.name];
-    const tsType = comment?.tsType;
-    const notNull =
-      comment?.notNull === true ? true : comment?.nullable === true ? false : column.notNull;
+    const { ts, note } = commentType({ base: column, comment });
     return {
       name: column.name,
-      ts: tsType ?? column.ts,
-      nullable: !notNull,
+      ts,
+      nullable: !commentNotNull({ comment, fallback: column.notNull }),
       reason: comment?.notNull || comment?.nullable ? 'comment' : 'catalog',
-      note: tsType ? undefined : column.tsNote,
+      note,
       doc: comment?.doc,
     };
   });
+}
+
+// The two resolvers below are the only places a column comment is applied, and they have
+// to agree: the schema block and every query selecting the column must report the same
+// type. Both read the precedence from here rather than restating it.
+
+// A comment's `@type` replaces the introspector's type — and its unmapped-type note with it.
+function commentType(input: { base: ResultField; comment: ColumnOverride | undefined }): {
+  ts: string;
+  note?: string;
+} {
+  const tsType = input.comment?.tsType;
+  return { ts: tsType ?? input.base.ts, note: tsType ? undefined : input.base.tsNote };
+}
+
+// `@notNull`/`@nullable` on a comment override whatever the schema declares.
+function commentNotNull(input: {
+  comment: ColumnOverride | undefined;
+  fallback: boolean;
+}): boolean {
+  return input.comment?.notNull === true
+    ? true
+    : input.comment?.nullable === true
+      ? false
+      : input.fallback;
 }
 
 // A comment override for a field name owned by exactly one in-scope relation.
@@ -222,12 +242,12 @@ export function parseColumnComment(text: string): ColumnOverride {
 
 // Parse every column comment; keep any that carries a marker or documentation.
 export function parseColumnComments(raw: RawColumnComments): ColumnOverrides {
-  const out: ColumnOverrides = {};
+  const out: ColumnOverrides = Object.create(null);
   for (const [table, columns] of Object.entries(raw)) {
     for (const [column, text] of Object.entries(columns)) {
       const override = parseColumnComment(text);
       if (override.notNull || override.nullable || override.tsType || override.doc) {
-        out[table] ??= {};
+        out[table] ??= Object.create(null);
         out[table]![column] = override;
       }
     }

@@ -38,6 +38,16 @@ export function propertyName(name: string): ts.PropertyName {
   return VALID_IDENTIFIER.test(name) ? f.createIdentifier(name) : f.createStringLiteral(name);
 }
 
+// The same, for a key in an object *literal*. `__proto__` there is the prototype-setter
+// form — as a plain or string key it produces no own property at all, so the emitted
+// `as const` type would claim a relation the runtime object doesn't have. A computed key
+// is an ordinary assignment and keeps the literal type.
+export function valuePropertyName(name: string): ts.PropertyName {
+  return name === '__proto__'
+    ? f.createComputedPropertyName(f.createStringLiteral(name))
+    : propertyName(name);
+}
+
 // Parse an arbitrary TS type (`'a' | 'b'`, `string[]`, `{ p: number }`) into a real
 // TypeNode, so the printer reproduces it verbatim and validates its syntax.
 export function typeNode(text: string): ts.TypeNode {

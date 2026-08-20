@@ -29,14 +29,14 @@ export interface SchemaColumn extends ResultField {
   notNull: boolean;
 }
 
+/** What a relation is. Postgres partitioned tables report as `table`; SQLite has no matviews. */
+export type RelationKind = 'table' | 'view' | 'materialized_view';
+
 /**
  * A base relation — table or view — with its columns and the names of its indexes
  * and constraints. Generic over the column shape: the introspector fills it with
  * `SchemaColumn`s, the emitter with the same `ResolvedField`s the queries use.
  */
-/** What a relation is. Postgres partitioned tables report as `table`; SQLite has no matviews. */
-export type RelationKind = 'table' | 'view' | 'materialized_view';
-
 export interface Table<Column> {
   name: string;
   kind: RelationKind;

@@ -7,6 +7,7 @@ import {
   resultName,
   tableName,
   typeNode,
+  valuePropertyName,
 } from '#emit/ast.ts';
 import type { EmitModel, EmitTable, ResolvedField } from '#types.ts';
 
@@ -192,7 +193,7 @@ function nodeMap(input: { names: string[]; nameKey: string }): ts.Expression {
   return f.createObjectLiteralExpression(
     input.names.map((name) =>
       f.createPropertyAssignment(
-        propertyName(name),
+        valuePropertyName(name),
         f.createObjectLiteralExpression([
           f.createPropertyAssignment(input.nameKey, f.createStringLiteral(name)),
         ]),
@@ -229,7 +230,7 @@ function schemaValue(tables: EmitTable[]): ts.VariableStatement {
       true,
     );
   const literal = f.createObjectLiteralExpression(
-    tables.map((table) => f.createPropertyAssignment(propertyName(table.name), entry(table))),
+    tables.map((table) => f.createPropertyAssignment(valuePropertyName(table.name), entry(table))),
     true,
   );
   const declaration = f.createVariableDeclaration(
@@ -276,6 +277,9 @@ export function schemaDeclarations(input: {
   schema: SchemaIndex;
 }): ts.Statement[] {
   const { tables, schema } = input;
+  if (tables.length === 0) {
+    return [];
+  }
   const statements: ts.Statement[] = [];
 
   for (const table of tables) {
@@ -325,10 +329,6 @@ export function schemaDeclarations(input: {
     );
     docComment({ node: entry, text: `Schema of \`${table.name}\`.` });
     statements.push(entry);
-  }
-
-  if (tables.length === 0) {
-    return statements;
   }
 
   statements.push(schemaValue(tables));
