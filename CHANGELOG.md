@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.5.0] - 2026-08-20
+
+### 🚀 Features
+
+- Emit the schema in the generated module (#22)
+- [**breaking**] Emit the generated module as queries.gen.ts (#24)
+
+### 📦 Build & Dependencies
+
+- Bump pglite to 0.5.5 (#25)
+
+### ⚙️ Miscellaneous Tasks
+
+- Fix editor settings for typescript v7 (#21)
+
 ## [0.4.0] - 2026-07-09
 
 ### 📦 Build & Dependencies
