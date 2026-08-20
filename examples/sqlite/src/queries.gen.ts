@@ -64,8 +64,9 @@ export interface IDealDetailsColumns {
 /** Schema of `deal_details`. */
 export interface IDealDetailsTable {
     columns: IDealDetailsColumns;
-    indexes: (typeof schema)["deal_details"]["indexes"][number];
-    constraints: (typeof schema)["deal_details"]["constraints"][number];
+    relationType: (typeof schema)["deal_details"]["_relationType"];
+    indexes: keyof (typeof schema)["deal_details"]["_indexes"];
+    constraints: keyof (typeof schema)["deal_details"]["_constraints"];
 }
 
 /** Columns of `deals`. */
@@ -82,8 +83,9 @@ export interface IDealsColumns {
 /** Schema of `deals`. */
 export interface IDealsTable {
     columns: IDealsColumns;
-    indexes: (typeof schema)["deals"]["indexes"][number];
-    constraints: (typeof schema)["deals"]["constraints"][number];
+    relationType: (typeof schema)["deals"]["_relationType"];
+    indexes: keyof (typeof schema)["deals"]["_indexes"];
+    constraints: keyof (typeof schema)["deals"]["_constraints"];
 }
 
 /** Columns of `users`. */
@@ -97,14 +99,52 @@ export interface IUsersColumns {
 /** Schema of `users`. */
 export interface IUsersTable {
     columns: IUsersColumns;
-    indexes: (typeof schema)["users"]["indexes"][number];
-    constraints: (typeof schema)["users"]["constraints"][number];
+    relationType: (typeof schema)["users"]["_relationType"];
+    indexes: keyof (typeof schema)["users"]["_indexes"];
+    constraints: keyof (typeof schema)["users"]["_constraints"];
 }
 
 export const schema = {
-    deal_details: { name: "deal_details", columns: ["deal_id", "status", "amount", "email", "display_name"], indexes: [], constraints: [] },
-    deals: { name: "deals", columns: ["id", "user_id", "amount", "status", "is_active", "closed_at", "attachment"], indexes: [], constraints: [] },
-    users: { name: "users", columns: ["id", "email", "display_name", "created_at"], indexes: [], constraints: [] }
+    deal_details: {
+        _relationName: "deal_details",
+        _relationType: "view",
+        _columns: {
+            deal_id: { _columnName: "deal_id" },
+            status: { _columnName: "status" },
+            amount: { _columnName: "amount" },
+            email: { _columnName: "email" },
+            display_name: { _columnName: "display_name" }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
+    deals: {
+        _relationName: "deals",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id" },
+            user_id: { _columnName: "user_id" },
+            amount: { _columnName: "amount" },
+            status: { _columnName: "status" },
+            is_active: { _columnName: "is_active" },
+            closed_at: { _columnName: "closed_at" },
+            attachment: { _columnName: "attachment" }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
+    users: {
+        _relationName: "users",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id" },
+            email: { _columnName: "email" },
+            display_name: { _columnName: "display_name" },
+            created_at: { _columnName: "created_at" }
+        },
+        _indexes: {},
+        _constraints: {}
+    }
 } as const;
 
 export interface Tables {

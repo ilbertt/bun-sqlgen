@@ -97,6 +97,12 @@ export interface IOptionalSearchKeysResult {
     search_key: string | null;
 }
 
+/** Result of query `UserByKey`. */
+export interface IUserByKeyResult {
+    id: string | null;
+    email: string | null;
+}
+
 export interface Queries {
     GetUserDeals: IGetUserDealsResult;
     ListDeals: IListDealsResult;
@@ -111,6 +117,7 @@ export interface Queries {
     UserSearchKeys: IUserSearchKeysResult;
     DealSearchKeys: IDealSearchKeysResult;
     OptionalSearchKeys: IOptionalSearchKeysResult;
+    UserByKey: IUserByKeyResult;
 }
 
 /** Columns of `deal_details`. */
@@ -126,8 +133,9 @@ export interface IDealDetailsColumns {
 /** Schema of `deal_details`. */
 export interface IDealDetailsTable {
     columns: IDealDetailsColumns;
-    indexes: (typeof schema)["deal_details"]["indexes"][number];
-    constraints: (typeof schema)["deal_details"]["constraints"][number];
+    relationType: (typeof schema)["deal_details"]["_relationType"];
+    indexes: keyof (typeof schema)["deal_details"]["_indexes"];
+    constraints: keyof (typeof schema)["deal_details"]["_constraints"];
 }
 
 /** Columns of `deal_meta`. */
@@ -147,8 +155,9 @@ export interface IDealMetaColumns {
 /** Schema of `deal_meta`. */
 export interface IDealMetaTable {
     columns: IDealMetaColumns;
-    indexes: (typeof schema)["deal_meta"]["indexes"][number];
-    constraints: (typeof schema)["deal_meta"]["constraints"][number];
+    relationType: (typeof schema)["deal_meta"]["_relationType"];
+    indexes: keyof (typeof schema)["deal_meta"]["_indexes"];
+    constraints: keyof (typeof schema)["deal_meta"]["_constraints"];
 }
 
 /** Columns of `deals`. */
@@ -164,8 +173,9 @@ export interface IDealsColumns {
 /** Schema of `deals`. */
 export interface IDealsTable {
     columns: IDealsColumns;
-    indexes: (typeof schema)["deals"]["indexes"][number];
-    constraints: (typeof schema)["deals"]["constraints"][number];
+    relationType: (typeof schema)["deals"]["_relationType"];
+    indexes: keyof (typeof schema)["deals"]["_indexes"];
+    constraints: keyof (typeof schema)["deals"]["_constraints"];
 }
 
 /** Columns of `payments`. */
@@ -179,8 +189,9 @@ export interface IPaymentsColumns {
 /** Schema of `payments`. */
 export interface IPaymentsTable {
     columns: IPaymentsColumns;
-    indexes: (typeof schema)["payments"]["indexes"][number];
-    constraints: (typeof schema)["payments"]["constraints"][number];
+    relationType: (typeof schema)["payments"]["_relationType"];
+    indexes: keyof (typeof schema)["payments"]["_indexes"];
+    constraints: keyof (typeof schema)["payments"]["_constraints"];
 }
 
 /** Columns of `users`. */
@@ -197,16 +208,98 @@ export interface IUsersColumns {
 /** Schema of `users`. */
 export interface IUsersTable {
     columns: IUsersColumns;
-    indexes: (typeof schema)["users"]["indexes"][number];
-    constraints: (typeof schema)["users"]["constraints"][number];
+    relationType: (typeof schema)["users"]["_relationType"];
+    indexes: keyof (typeof schema)["users"]["_indexes"];
+    constraints: keyof (typeof schema)["users"]["_constraints"];
 }
 
 export const schema = {
-    deal_details: { name: "deal_details", columns: ["deal_id", "status", "amount", "email", "display_name", "status_upper"], indexes: [], constraints: [] },
-    deal_meta: { name: "deal_meta", columns: ["id", "deal_id", "stage", "tags", "details", "scores"], indexes: ["deal_meta_pkey"], constraints: ["deal_meta_deal_id_fkey", "deal_meta_pkey"] },
-    deals: { name: "deals", columns: ["id", "user_id", "amount", "status", "search_key"], indexes: ["deals_pkey"], constraints: ["deals_pkey", "deals_user_id_fkey"] },
-    payments: { name: "payments", columns: ["id", "deal_id", "amount", "paid_at"], indexes: ["payments_pkey"], constraints: ["payments_deal_id_fkey", "payments_pkey"] },
-    users: { name: "users", columns: ["id", "email", "display_name", "created_at", "updated_at", "search_key"], indexes: ["users_pkey"], constraints: ["users_pkey"] }
+    deal_details: {
+        _relationName: "deal_details",
+        _relationType: "view",
+        _columns: {
+            deal_id: { _columnName: "deal_id" },
+            status: { _columnName: "status" },
+            amount: { _columnName: "amount" },
+            email: { _columnName: "email" },
+            display_name: { _columnName: "display_name" },
+            status_upper: { _columnName: "status_upper" }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
+    deal_meta: {
+        _relationName: "deal_meta",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id" },
+            deal_id: { _columnName: "deal_id" },
+            stage: { _columnName: "stage" },
+            tags: { _columnName: "tags" },
+            details: { _columnName: "details" },
+            scores: { _columnName: "scores" }
+        },
+        _indexes: {
+            deal_meta_pkey: { _indexName: "deal_meta_pkey" }
+        },
+        _constraints: {
+            deal_meta_deal_id_fkey: { _constraintName: "deal_meta_deal_id_fkey" },
+            deal_meta_pkey: { _constraintName: "deal_meta_pkey" }
+        }
+    },
+    deals: {
+        _relationName: "deals",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id" },
+            user_id: { _columnName: "user_id" },
+            amount: { _columnName: "amount" },
+            status: { _columnName: "status" },
+            search_key: { _columnName: "search_key" }
+        },
+        _indexes: {
+            deals_pkey: { _indexName: "deals_pkey" }
+        },
+        _constraints: {
+            deals_pkey: { _constraintName: "deals_pkey" },
+            deals_user_id_fkey: { _constraintName: "deals_user_id_fkey" }
+        }
+    },
+    payments: {
+        _relationName: "payments",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id" },
+            deal_id: { _columnName: "deal_id" },
+            amount: { _columnName: "amount" },
+            paid_at: { _columnName: "paid_at" }
+        },
+        _indexes: {
+            payments_pkey: { _indexName: "payments_pkey" }
+        },
+        _constraints: {
+            payments_deal_id_fkey: { _constraintName: "payments_deal_id_fkey" },
+            payments_pkey: { _constraintName: "payments_pkey" }
+        }
+    },
+    users: {
+        _relationName: "users",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id" },
+            email: { _columnName: "email" },
+            display_name: { _columnName: "display_name" },
+            created_at: { _columnName: "created_at" },
+            updated_at: { _columnName: "updated_at" },
+            search_key: { _columnName: "search_key" }
+        },
+        _indexes: {
+            users_pkey: { _indexName: "users_pkey" }
+        },
+        _constraints: {
+            users_pkey: { _constraintName: "users_pkey" }
+        }
+    }
 } as const;
 
 export interface Tables {

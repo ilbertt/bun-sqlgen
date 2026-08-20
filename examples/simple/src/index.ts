@@ -144,13 +144,30 @@ const optional = await sql.OptionalSearchKeys`
 `;
 console.log(optional[0]?.search_key?.length); // string | null
 
-// The schema lands as values too, so a name is usable at runtime and not only in a
-// type — and both come from the same emit, so they can't drift.
-console.log(schema.users.columns.join(', ')); // id, email, display_name, created_at, ...
-const pk: DatabaseTables['users']['constraints'] = schema.users.constraints[0];
+// The schema lands as values too, so an identifier is reachable at runtime and still
+// checked: every node carries its own name, and a name that doesn't exist won't compile.
+console.log(schema.users._relationName); // 'users'
+console.log(schema.users._columns.display_name._columnName); // 'display_name'
+console.log(schema.deal_meta._constraints.deal_meta_pkey._constraintName); // 'deal_meta_pkey'
+
+// @ts-expect-error — `users` has no `title` column
+console.log(schema.users._columns.title);
+
+// Reaching an identifier is the point: it can go straight into the SQL.
+const byKey = await sql.UserByKey`
+  SELECT id, email FROM users WHERE ${sql(schema.users._columns.search_key._columnName)} = ${'a@b.c'}
+`;
+console.log(byKey[0]?.email);
+
+// Value and type come from the same emit, so they can't drift apart.
+const pk: DatabaseTables['users']['constraints'] =
+  schema.users._constraints.users_pkey._constraintName;
 console.log(pk); // 'users_pkey'
 
-// A view has no indexes, so its union is `never` and nothing can be assigned to it.
-// @ts-expect-error — `deal_details` is a view
+// A view is typed as one, and has no indexes — so that union is `never`.
+const kind: DatabaseTables['deal_details']['relationType'] = 'view';
+console.log(kind);
+
+// @ts-expect-error — `deal_details` is a view; it has no indexes
 const noIndex: DatabaseTables['deal_details']['indexes'] = 'anything';
 console.log(noIndex);

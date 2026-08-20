@@ -39,8 +39,9 @@ export interface IArticlesColumns {
 /** Schema of `articles`. */
 export interface IArticlesTable {
     columns: IArticlesColumns;
-    indexes: (typeof schema)["articles"]["indexes"][number];
-    constraints: (typeof schema)["articles"]["constraints"][number];
+    relationType: (typeof schema)["articles"]["_relationType"];
+    indexes: keyof (typeof schema)["articles"]["_indexes"];
+    constraints: keyof (typeof schema)["articles"]["_constraints"];
 }
 
 /** Columns of `authors`. */
@@ -54,13 +55,52 @@ export interface IAuthorsColumns {
 /** Schema of `authors`. */
 export interface IAuthorsTable {
     columns: IAuthorsColumns;
-    indexes: (typeof schema)["authors"]["indexes"][number];
-    constraints: (typeof schema)["authors"]["constraints"][number];
+    relationType: (typeof schema)["authors"]["_relationType"];
+    indexes: keyof (typeof schema)["authors"]["_indexes"];
+    constraints: keyof (typeof schema)["authors"]["_constraints"];
 }
 
 export const schema = {
-    articles: { name: "articles", columns: ["id", "author_id", "slug", "title", "body", "created_by"], indexes: ["articles_author_idx", "articles_pkey", "articles_slug_idx", "articles_slug_key"], constraints: ["articles_author_id_fkey", "articles_pkey", "articles_slug_key"] },
-    authors: { name: "authors", columns: ["id", "email", "name"], indexes: ["authors_email_key", "authors_pkey"], constraints: ["authors_email_key", "authors_pkey"] }
+    articles: {
+        _relationName: "articles",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id" },
+            author_id: { _columnName: "author_id" },
+            slug: { _columnName: "slug" },
+            title: { _columnName: "title" },
+            body: { _columnName: "body" },
+            created_by: { _columnName: "created_by" }
+        },
+        _indexes: {
+            articles_author_idx: { _indexName: "articles_author_idx" },
+            articles_pkey: { _indexName: "articles_pkey" },
+            articles_slug_idx: { _indexName: "articles_slug_idx" },
+            articles_slug_key: { _indexName: "articles_slug_key" }
+        },
+        _constraints: {
+            articles_author_id_fkey: { _constraintName: "articles_author_id_fkey" },
+            articles_pkey: { _constraintName: "articles_pkey" },
+            articles_slug_key: { _constraintName: "articles_slug_key" }
+        }
+    },
+    authors: {
+        _relationName: "authors",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id" },
+            email: { _columnName: "email" },
+            name: { _columnName: "name" }
+        },
+        _indexes: {
+            authors_email_key: { _indexName: "authors_email_key" },
+            authors_pkey: { _indexName: "authors_pkey" }
+        },
+        _constraints: {
+            authors_email_key: { _constraintName: "authors_email_key" },
+            authors_pkey: { _constraintName: "authors_pkey" }
+        }
+    }
 } as const;
 
 export interface Tables {

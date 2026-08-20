@@ -134,6 +134,8 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
         .all() as IndexListRow[];
       return {
         name: rel.name,
+        // SQLite has only these two; `sqlite_master.type` is already filtered to them.
+        kind: rel.type === 'view' ? 'view' : 'table',
         columns: cols
           .filter((c) => c.hidden !== 1)
           .map((c) => {
@@ -158,7 +160,7 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
     const inList = kinds.map((k) => `'${k}'`).join(', ');
     return db
       .prepare(
-        `SELECT name, sql FROM sqlite_master
+        `SELECT name, type, sql FROM sqlite_master
          WHERE type IN (${inList}) AND name NOT LIKE 'sqlite_%'
          ORDER BY name`,
       )
@@ -192,6 +194,7 @@ interface IndexListRow {
 
 interface SqliteMasterRow {
   name: string;
+  type: string;
   /** The `CREATE` statement, `null` for the relations SQLite defines itself. */
   sql: string | null;
 }

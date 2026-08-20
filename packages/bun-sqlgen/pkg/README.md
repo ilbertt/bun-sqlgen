@@ -92,14 +92,22 @@ type UserRow = DatabaseTables['users']['columns'];
 type UserIndex = DatabaseTables['users']['indexes']; // 'users_pkey' | 'users_email_idx'
 ```
 
-The names are also emitted as values, for the places one is needed at runtime:
+The same names are emitted as values, so an identifier can be reached at runtime and
+still be checked — a name that doesn't exist won't compile:
 
 ```ts
 import { schema } from './queries.gen.ts';
 
-schema.users.columns; // ['id', 'email', 'display_name']
-schema.users.constraints; // ['users_pkey', 'users_email_key']
+schema.users._relationName; // 'users'
+schema.users._relationType; // 'table' | 'view' | 'materialized_view'
+schema.users._columns.email._columnName; // 'email'
+schema.users._constraints.users_pkey._constraintName; // 'users_pkey'
+schema.users._columns.nope; // compile error
 ```
+
+Every node is an object carrying its own `_…Name` rather than being the bare string, so
+detail can be added later — a column's foreign keys, an index's columns — without
+changing how an identifier is read.
 
 Columns are typed like the query results are, and a result field that traces to a base
 column references it (`email: IUsersColumns['email']`) rather than repeating its type.

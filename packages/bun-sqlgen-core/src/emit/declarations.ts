@@ -166,41 +166,68 @@ export function registryInterface(queries: EmitModel[]): ts.InterfaceDeclaration
   );
 }
 
-const stringArray = (names: string[]): ts.Expression =>
-  f.createArrayLiteralExpression(names.map((n) => f.createStringLiteral(n)));
-
-// `(typeof schema)["users"]["indexes"][number]` — the union read back off the emitted
-// const rather than repeated, so each name appears in the module exactly once. An empty
-// `readonly []` indexes to `never`, which is what a relation with none should give.
-function namesUnion(input: { table: string; key: string }): ts.TypeNode {
+// `(typeof schema)["users"]["_indexes"]`, the node map behind one relation member.
+function schemaMember(input: { table: string; key: string }): ts.TypeNode {
   const at = (member: { object: ts.TypeNode; key: string }): ts.TypeNode =>
     f.createIndexedAccessTypeNode(
       member.object,
       f.createLiteralTypeNode(f.createStringLiteral(member.key)),
     );
-  const entry = at({
+  const relation = at({
     object: f.createTypeQueryNode(f.createIdentifier(SCHEMA_VALUE)),
     key: input.table,
   });
-  return f.createIndexedAccessTypeNode(
-    at({ object: entry, key: input.key }),
-    f.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+  return at({ object: relation, key: input.key });
+}
+
+// The names read back off the emitted const rather than repeated. An empty node map
+// gives `never`, which is what a relation with no indexes should give.
+const namesUnion = (input: { table: string; key: string }): ts.TypeNode =>
+  f.createTypeOperatorNode(ts.SyntaxKind.KeyOfKeyword, schemaMember(input));
+
+// `{ id: { _columnName: "id" }, … }` — every node is an object carrying its own name,
+// so detail (a column's foreign keys, an index's columns) can be added later as another
+// `_` key without changing how the identifier is read.
+function nodeMap(input: { names: string[]; nameKey: string }): ts.Expression {
+  return f.createObjectLiteralExpression(
+    input.names.map((name) =>
+      f.createPropertyAssignment(
+        propertyName(name),
+        f.createObjectLiteralExpression([
+          f.createPropertyAssignment(input.nameKey, f.createStringLiteral(name)),
+        ]),
+      ),
+    ),
+    true,
   );
 }
 
 /**
- * `export const schema = { users: { name, columns, indexes, constraints } } as const` —
- * the schema as values, for the places a name is needed at runtime rather than in a
- * type: an `ON CONFLICT ON CONSTRAINT`, a dynamic column list, migration tooling.
+ * `export const schema = { … } as const` — the schema as values, so an identifier can
+ * be reached at runtime and still be checked: `schema.payments._columns.id._columnName`
+ * is `"id"`, and a column that doesn't exist is a compile error.
  */
 function schemaValue(tables: EmitTable[]): ts.VariableStatement {
   const entry = (table: EmitTable): ts.Expression =>
-    f.createObjectLiteralExpression([
-      f.createPropertyAssignment('name', f.createStringLiteral(table.name)),
-      f.createPropertyAssignment('columns', stringArray(table.columns.map((c) => c.name))),
-      f.createPropertyAssignment('indexes', stringArray(table.indexes)),
-      f.createPropertyAssignment('constraints', stringArray(table.constraints)),
-    ]);
+    f.createObjectLiteralExpression(
+      [
+        f.createPropertyAssignment('_relationName', f.createStringLiteral(table.name)),
+        f.createPropertyAssignment('_relationType', f.createStringLiteral(table.kind)),
+        f.createPropertyAssignment(
+          '_columns',
+          nodeMap({ names: table.columns.map((c) => c.name), nameKey: '_columnName' }),
+        ),
+        f.createPropertyAssignment(
+          '_indexes',
+          nodeMap({ names: table.indexes, nameKey: '_indexName' }),
+        ),
+        f.createPropertyAssignment(
+          '_constraints',
+          nodeMap({ names: table.constraints, nameKey: '_constraintName' }),
+        ),
+      ],
+      true,
+    );
   const literal = f.createObjectLiteralExpression(
     tables.map((table) => f.createPropertyAssignment(propertyName(table.name), entry(table))),
     true,
@@ -278,15 +305,21 @@ export function schemaDeclarations(input: {
         ),
         f.createPropertySignature(
           undefined,
+          'relationType',
+          undefined,
+          schemaMember({ table: table.name, key: '_relationType' }),
+        ),
+        f.createPropertySignature(
+          undefined,
           'indexes',
           undefined,
-          namesUnion({ table: table.name, key: 'indexes' }),
+          namesUnion({ table: table.name, key: '_indexes' }),
         ),
         f.createPropertySignature(
           undefined,
           'constraints',
           undefined,
-          namesUnion({ table: table.name, key: 'constraints' }),
+          namesUnion({ table: table.name, key: '_constraints' }),
         ),
       ],
     );

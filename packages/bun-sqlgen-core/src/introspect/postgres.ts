@@ -8,6 +8,7 @@ import type {
   IntrospectorOptions,
   Provenance,
   RawColumnComments,
+  RelationKind,
   ResultField,
   SchemaTable,
   TypeCatalog,
@@ -124,7 +125,7 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
     // `pg_attribute` rather than `information_schema.columns`: it carries the type OID,
     // so columns resolve through the same mapper the result fields use.
     const cols = await db.query<RelationColumnRow>(`
-      SELECT n.nspname AS schema_name, c.relname AS table_name, a.attname AS column_name,
+      SELECT n.nspname AS schema_name, c.relname AS table_name, c.relkind, a.attname AS column_name,
              a.atttypid AS type_oid, a.attnotnull AS not_null
       FROM pg_attribute a
       JOIN pg_class c ON c.oid = a.attrelid
@@ -138,7 +139,13 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
     for (const row of cols.rows) {
       let table = byRelation.get(qualified(row));
       if (!table) {
-        table = { name: row.table_name, columns: [], indexes: [], constraints: [] };
+        table = {
+          name: row.table_name,
+          kind: RELATION_KIND[row.relkind] ?? 'table',
+          columns: [],
+          indexes: [],
+          constraints: [],
+        };
         byRelation.set(qualified(row), table);
       }
       const { ts, note } = oidToTs({ oid: Number(row.type_oid), types });
@@ -251,9 +258,19 @@ interface WritableRow {
   column_name: string;
 }
 
+// `relkind` as the generated module reports it. A partitioned table ('p') is still a
+// table; only a materialized view carries both a view's definition and real indexes.
+const RELATION_KIND: Record<string, RelationKind> = {
+  r: 'table',
+  p: 'table',
+  v: 'view',
+  m: 'materialized_view',
+};
+
 interface RelationColumnRow {
   schema_name: string;
   table_name: string;
+  relkind: string;
   column_name: string;
   type_oid: number;
   not_null: boolean;
