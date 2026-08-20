@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.5.1] - 2026-08-20
+
+### 📦 Build & Dependencies
+
+- Upgrade to bun 1.4 (#27)
+
 ## [0.5.0] - 2026-08-20
 
 ### 🚀 Features
