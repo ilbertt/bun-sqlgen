@@ -24,14 +24,14 @@
     }
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.3",
-    "@commitlint/cli": "^21.2.1",
-    "@commitlint/config-conventional": "^21.2.0",
-    "@commitlint/format": "^21.2.0",
+    "@biomejs/biome": "^2.5.9",
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "@commitlint/format": "^21.2.2",
     "@commitlint/types": "^21.2.0",
     "@types/bun": "catalog:",
     "typescript": "catalog:",
-    "turbo": "^2.10.4"
+    "turbo": "^2.10.11"
   },
   "packageManager": "bun@1.4.0"
 }
