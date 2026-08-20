@@ -9,6 +9,7 @@ export { generate } from '#generate.ts';
 export { oidToTs, PG_OID } from '#oids.ts';
 export type {
   Catalog,
+  ColumnForeignKey,
   DescribeResult,
   Dialect,
   DiscoveredQuery,
@@ -17,6 +18,8 @@ export type {
   Provenance,
   ResolvedField,
   ResultField,
+  SchemaColumn,
+  SchemaTable,
   TypeCatalog,
   TypeInfo,
   WritableColumns,

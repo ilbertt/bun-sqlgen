@@ -3,21 +3,21 @@
 
 /** Result of query `GetArticle`. */
 export interface IGetArticleResult {
-    id: string;
+    id: IArticlesColumns["id"];
     /** Case-insensitive URL slug. */
-    slug: string;
-    title: string;
-    body: string | null;
-    created_by: string;
+    slug: IArticlesColumns["slug"];
+    title: IArticlesColumns["title"];
+    body: IArticlesColumns["body"];
+    created_by: IArticlesColumns["created_by"];
 }
 
 /** Result of query `ListArticlesWithAuthor`. */
 export interface IListArticlesWithAuthorResult {
-    id: string;
-    title: string;
+    id: IArticlesColumns["id"];
+    title: IArticlesColumns["title"];
     /** Case-insensitive contact address. */
-    email: string | null;
-    name: string | null;
+    email: IAuthorsColumns["email"] | null;
+    name: IAuthorsColumns["name"] | null;
 }
 
 export interface Queries {
@@ -25,8 +25,93 @@ export interface Queries {
     ListArticlesWithAuthor: IListArticlesWithAuthorResult;
 }
 
+/** Columns of `articles`. */
+export interface IArticlesColumns {
+    id: string;
+    author_id: string;
+    /** Case-insensitive URL slug. */
+    slug: string;
+    title: string;
+    body: string | null;
+    created_by: string;
+}
+
+/** Schema of `articles`. */
+export interface IArticlesTable {
+    columns: IArticlesColumns;
+    relationType: (typeof schema)["articles"]["_relationType"];
+    indexes: keyof (typeof schema)["articles"]["_indexes"];
+    constraints: keyof (typeof schema)["articles"]["_constraints"];
+}
+
+/** Columns of `authors`. */
+export interface IAuthorsColumns {
+    id: string;
+    /** Case-insensitive contact address. */
+    email: string;
+    name: string;
+}
+
+/** Schema of `authors`. */
+export interface IAuthorsTable {
+    columns: IAuthorsColumns;
+    relationType: (typeof schema)["authors"]["_relationType"];
+    indexes: keyof (typeof schema)["authors"]["_indexes"];
+    constraints: keyof (typeof schema)["authors"]["_constraints"];
+}
+
+export const schema = {
+    articles: {
+        _relationName: "articles",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            author_id: { _columnName: "author_id", _foreignKeys: { articles_author_id_fkey: { _constraintName: "articles_author_id_fkey", _references: { _relationName: "authors", _columnName: "id" } } } },
+            slug: { _columnName: "slug", _foreignKeys: {} },
+            title: { _columnName: "title", _foreignKeys: {} },
+            body: { _columnName: "body", _foreignKeys: {} },
+            created_by: { _columnName: "created_by", _foreignKeys: {} }
+        },
+        _indexes: {
+            articles_author_idx: { _indexName: "articles_author_idx" },
+            articles_pkey: { _indexName: "articles_pkey" },
+            articles_slug_idx: { _indexName: "articles_slug_idx" },
+            articles_slug_key: { _indexName: "articles_slug_key" }
+        },
+        _constraints: {
+            articles_author_id_fkey: { _constraintName: "articles_author_id_fkey" },
+            articles_pkey: { _constraintName: "articles_pkey" },
+            articles_slug_key: { _constraintName: "articles_slug_key" }
+        }
+    },
+    authors: {
+        _relationName: "authors",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            email: { _columnName: "email", _foreignKeys: {} },
+            name: { _columnName: "name", _foreignKeys: {} }
+        },
+        _indexes: {
+            authors_email_key: { _indexName: "authors_email_key" },
+            authors_pkey: { _indexName: "authors_pkey" }
+        },
+        _constraints: {
+            authors_email_key: { _constraintName: "authors_email_key" },
+            authors_pkey: { _constraintName: "authors_pkey" }
+        }
+    }
+} as const;
+
+export interface Tables {
+    articles: IArticlesTable;
+    authors: IAuthorsTable;
+}
+
 declare module "@repo/bun-sqlgen" {
     interface QueryResults extends Queries {
+    }
+    interface DatabaseTables extends Tables {
     }
 }
 

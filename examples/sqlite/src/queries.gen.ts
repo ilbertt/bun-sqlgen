@@ -3,31 +3,31 @@
 
 /** Result of query `ListDeals`. */
 export interface IListDealsResult {
-    id: number;
-    status: string;
-    amount: number;
-    is_active: number;
+    id: IDealsColumns["id"];
+    status: IDealsColumns["status"];
+    amount: IDealsColumns["amount"];
+    is_active: IDealsColumns["is_active"];
 }
 
 /** Result of query `GetDeal`. */
 export interface IGetDealResult {
-    id: number;
-    amount: number;
-    attachment: Uint8Array | null;
-    closed_at: string | null;
+    id: IDealsColumns["id"];
+    amount: IDealsColumns["amount"];
+    attachment: IDealsColumns["attachment"];
+    closed_at: IDealsColumns["closed_at"];
 }
 
 /** Result of query `GetUserDeals`. */
 export interface IGetUserDealsResult {
     id: number | null;
-    email: string | null;
-    amount: number | null;
+    email: IUsersColumns["email"] | null;
+    amount: IDealsColumns["amount"] | null;
 }
 
 /** Result of query `UserEmails`. */
 export interface IUserEmailsResult {
-    email: string;
-    amount: number | null;
+    email: IUsersColumns["email"];
+    amount: IDealsColumns["amount"] | null;
 }
 
 /** Result of query `DealStats`. */
@@ -38,9 +38,9 @@ export interface IDealStatsResult {
 
 /** Result of query `SearchDeals`. */
 export interface ISearchDealsResult {
-    id: number;
-    status: string;
-    amount: number;
+    id: IDealsColumns["id"];
+    status: IDealsColumns["status"];
+    amount: IDealsColumns["amount"];
 }
 
 export interface Queries {
@@ -52,8 +52,111 @@ export interface Queries {
     SearchDeals: ISearchDealsResult;
 }
 
+/** Columns of `deal_details`. */
+export interface IDealDetailsColumns {
+    deal_id: number | null;
+    status: string | null;
+    amount: number | null;
+    email: string | null;
+    display_name: string | null;
+}
+
+/** Schema of `deal_details`. */
+export interface IDealDetailsTable {
+    columns: IDealDetailsColumns;
+    relationType: (typeof schema)["deal_details"]["_relationType"];
+    indexes: keyof (typeof schema)["deal_details"]["_indexes"];
+    constraints: keyof (typeof schema)["deal_details"]["_constraints"];
+}
+
+/** Columns of `deals`. */
+export interface IDealsColumns {
+    id: number;
+    user_id: number;
+    amount: number;
+    status: string;
+    is_active: number;
+    closed_at: string | null;
+    attachment: Uint8Array | null;
+}
+
+/** Schema of `deals`. */
+export interface IDealsTable {
+    columns: IDealsColumns;
+    relationType: (typeof schema)["deals"]["_relationType"];
+    indexes: keyof (typeof schema)["deals"]["_indexes"];
+    constraints: keyof (typeof schema)["deals"]["_constraints"];
+}
+
+/** Columns of `users`. */
+export interface IUsersColumns {
+    id: number;
+    email: string;
+    display_name: string | null;
+    created_at: string;
+}
+
+/** Schema of `users`. */
+export interface IUsersTable {
+    columns: IUsersColumns;
+    relationType: (typeof schema)["users"]["_relationType"];
+    indexes: keyof (typeof schema)["users"]["_indexes"];
+    constraints: keyof (typeof schema)["users"]["_constraints"];
+}
+
+export const schema = {
+    deal_details: {
+        _relationName: "deal_details",
+        _relationType: "view",
+        _columns: {
+            deal_id: { _columnName: "deal_id", _foreignKeys: {} },
+            status: { _columnName: "status", _foreignKeys: {} },
+            amount: { _columnName: "amount", _foreignKeys: {} },
+            email: { _columnName: "email", _foreignKeys: {} },
+            display_name: { _columnName: "display_name", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
+    deals: {
+        _relationName: "deals",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            user_id: { _columnName: "user_id", _foreignKeys: {} },
+            amount: { _columnName: "amount", _foreignKeys: {} },
+            status: { _columnName: "status", _foreignKeys: {} },
+            is_active: { _columnName: "is_active", _foreignKeys: {} },
+            closed_at: { _columnName: "closed_at", _foreignKeys: {} },
+            attachment: { _columnName: "attachment", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
+    users: {
+        _relationName: "users",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            email: { _columnName: "email", _foreignKeys: {} },
+            display_name: { _columnName: "display_name", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
+    }
+} as const;
+
+export interface Tables {
+    deal_details: IDealDetailsTable;
+    deals: IDealsTable;
+    users: IUsersTable;
+}
+
 declare module "@repo/bun-sqlgen" {
     interface QueryResults extends Queries {
+    }
+    interface DatabaseTables extends Tables {
     }
 }
 

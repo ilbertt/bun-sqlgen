@@ -15,8 +15,9 @@ bin — a thin [parsh](https://github.com/ilbertt/parsh) front-end over
 `index.*`, with no special build step. It is deliberately **not** a re-export of
 [`@repo/bun-sqlgen-core`](../bun-sqlgen-core): that would leak the private package into
 the published declaration. Core consumes only the resolved introspection settings
-(`IntrospectorOptions`); its config loader casts the loaded module to a shape derived
-from those, so the two stay compatible without core depending on this submodule.
+(`IntrospectorOptions`) plus the generation flags it shares with the CLI; its config
+loader casts the loaded module to a shape derived from those, so the two stay
+compatible without core depending on this submodule.
 
 ## Publishing
 

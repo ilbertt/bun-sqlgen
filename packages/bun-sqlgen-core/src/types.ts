@@ -25,6 +25,40 @@ export interface ResultField {
 }
 
 /**
+ * A foreign key as it applies to one of its columns. A composite key appears once on
+ * each column it spans, paired with the column that column points at.
+ */
+export interface ColumnForeignKey {
+  /** The constraint's name — the identifier `DROP CONSTRAINT` takes. */
+  name: string;
+  references: { table: string; column: string };
+}
+
+/** A base relation's column as the introspector reports it, before overrides. */
+export interface SchemaColumn extends ResultField {
+  notNull: boolean;
+  foreignKeys: ColumnForeignKey[];
+}
+
+/** What a relation is. Postgres partitioned tables report as `table`; SQLite has no matviews. */
+export type RelationKind = 'table' | 'view' | 'materialized_view';
+
+/**
+ * A base relation — table or view — with its columns and the names of its indexes
+ * and constraints. Generic over the column shape: the introspector fills it with
+ * `SchemaColumn`s, the emitter with the same `ResolvedField`s the queries use.
+ */
+export interface Table<Column> {
+  name: string;
+  kind: RelationKind;
+  columns: Column[];
+  indexes: string[];
+  constraints: string[];
+}
+
+export type SchemaTable = Table<SchemaColumn>;
+
+/**
  * Where an output column came from, traced through the plan. A `column` is a
  * base-table column (possibly on the nullable side of an outer join); anything
  * else (functions, CASE, casts, aggregates) is an opaque `expr`.
@@ -37,7 +71,17 @@ export type Provenance =
       outerNullable: boolean;
       candidates?: string[];
     }
-  | { kind: 'expr'; expr: string };
+  | {
+      kind: 'expr';
+      expr: string;
+      /**
+       * The single relation the expression's inputs belong to, when they agree on one.
+       * A generated column reaches the plan as its generating expression, so this is
+       * the only thing tying it back to the table whose comment documents it.
+       */
+      relation?: string;
+      outerNullable: boolean;
+    };
 
 export interface DescribeResult {
   fields: ResultField[];
@@ -81,6 +125,12 @@ export type NullabilityReason =
   | 'unresolved'
   | 'expr';
 
+/** The base column a result field traces back to. */
+export interface ColumnSource {
+  table: string;
+  column: string;
+}
+
 export interface ResolvedField {
   name: string;
   ts: string;
@@ -89,6 +139,12 @@ export interface ResolvedField {
   note?: string;
   /** The source column's comment prose, emitted as the field's JSDoc. */
   doc?: string;
+  /**
+   * Set when the field traces to a base column and takes that column's type — the
+   * emitter points at the schema block instead of repeating the type. Left unset by a
+   * per-query `@type`, whose whole point is to override what the column says.
+   */
+  source?: ColumnSource;
 }
 
 export interface DiscoveredQuery {
@@ -104,6 +160,13 @@ export interface EmitModel {
   resultFields: ResolvedField[];
 }
 
+/** A resolved column plus the schema facts the emitter reports alongside its type. */
+export interface EmitColumn extends ResolvedField {
+  foreignKeys: ColumnForeignKey[];
+}
+
+export type EmitTable = Table<EmitColumn>;
+
 /** Which engine introspects the migrations at build time. Defaults to `postgres`. */
 export type Dialect = 'postgres' | 'sqlite';
 
@@ -117,6 +180,8 @@ export interface Introspector {
   columnComments: () => Promise<RawColumnComments>;
   /** Writable columns (not identity/generated), for SET-clause neutralization. */
   writableColumns: () => Promise<WritableColumns>;
+  /** Every base relation with its columns, index names and constraint names. */
+  tables: () => Promise<SchemaTable[]>;
   close: () => Promise<void>;
 }
 

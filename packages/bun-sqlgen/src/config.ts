@@ -6,6 +6,11 @@ export type Dialect = 'postgres' | 'sqlite';
 interface BaseConfig {
   /** Database engine the queries run against. Defaults to `postgres`. */
   dialect?: Dialect;
+  /**
+   * Emit the schema block — every table and view with its columns, index names and
+   * constraint names. Defaults to `true`; `--no-schema` turns it off from the CLI.
+   */
+  schema?: boolean;
   /** SQL run before migrations (stub functions/types/extensions). */
   prelude?: string;
   /** Rewrite or strip statements the throwaway DB can't run, per migration file. */

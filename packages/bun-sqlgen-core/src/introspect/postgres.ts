@@ -8,7 +8,10 @@ import type {
   IntrospectorOptions,
   Provenance,
   RawColumnComments,
+  RelationKind,
   ResultField,
+  SchemaColumn,
+  SchemaTable,
   TypeCatalog,
   TypeInfo,
   WritableColumns,
@@ -65,15 +68,18 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
   }
 
   // Per-column NOT NULL — the piece describeQuery can't give us.
+  // Relation and column names come from the schema, and `__proto__` is a legal one:
+  // on an ordinary object it is the prototype accessor, so `map[name] ??= …` never
+  // assigns and the later `.push`/lookup fails. A null-prototype record has no such key.
   async function catalog(): Promise<Catalog> {
     const r = await db.query<CatalogRow>(`
       SELECT table_name, column_name, (is_nullable = 'NO') AS not_null
       FROM information_schema.columns
       WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
     `);
-    const map: Catalog = {};
+    const map: Catalog = Object.create(null);
     for (const row of r.rows) {
-      map[row.table_name] ??= {};
+      map[row.table_name] ??= Object.create(null);
       map[row.table_name]![row.column_name] = row.not_null;
     }
     return map;
@@ -90,9 +96,9 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE d.objsubid > 0 AND n.nspname NOT IN ('pg_catalog', 'information_schema')
     `);
-    const map: RawColumnComments = {};
+    const map: RawColumnComments = Object.create(null);
     for (const row of r.rows) {
-      map[row.table_name] ??= {};
+      map[row.table_name] ??= Object.create(null);
       map[row.table_name]![row.column_name] = row.description;
     }
     return map;
@@ -108,7 +114,7 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
         AND is_identity = 'NO' AND is_generated = 'NEVER'
       ORDER BY table_name, ordinal_position
     `);
-    const map: WritableColumns = {};
+    const map: WritableColumns = Object.create(null);
     for (const row of r.rows) {
       map[row.table_name] ??= [];
       map[row.table_name]!.push(row.column_name);
@@ -116,8 +122,112 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
     return map;
   }
 
-  return { describe, catalog, columnComments, writableColumns, close: () => db.close() };
+  // The schema block: every table and view with its columns typed exactly as a query
+  // selecting them would be, plus the names of its indexes and constraints.
+  async function tables(): Promise<SchemaTable[]> {
+    const types = await getTypes();
+    // `pg_attribute` rather than `information_schema.columns`: it carries the type OID,
+    // so columns resolve through the same mapper the result fields use.
+    const cols = await db.query<RelationColumnRow>(`
+      SELECT n.nspname AS schema_name, c.relname AS table_name, c.relkind, a.attname AS column_name,
+             a.atttypid AS type_oid, a.attnotnull AS not_null
+      FROM pg_attribute a
+      JOIN pg_class c ON c.oid = a.attrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relkind IN ('r', 'p', 'v', 'm')
+        AND a.attnum > 0 AND NOT a.attisdropped
+        AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+      ORDER BY n.nspname, c.relname, a.attnum
+    `);
+    const byRelation = new Map<string, SchemaTable>();
+    const byColumn = new Map<string, SchemaColumn>();
+    for (const row of cols.rows) {
+      let table = byRelation.get(qualified(row));
+      if (!table) {
+        table = {
+          name: row.table_name,
+          kind: RELATION_KIND[row.relkind] ?? 'table',
+          columns: [],
+          indexes: [],
+          constraints: [],
+        };
+        byRelation.set(qualified(row), table);
+      }
+      const { ts, note } = oidToTs({ oid: Number(row.type_oid), types });
+      const column: SchemaColumn = {
+        name: row.column_name,
+        ts,
+        tsNote: note,
+        notNull: row.not_null,
+        foreignKeys: [],
+      };
+      table.columns.push(column);
+      byColumn.set(`${qualified(row)}.${row.column_name}`, column);
+    }
+
+    const indexes = await db.query<RelationIndexRow>(`
+      SELECT n.nspname AS schema_name, c.relname AS table_name, i.relname AS index_name
+      FROM pg_index x
+      JOIN pg_class c ON c.oid = x.indrelid
+      JOIN pg_class i ON i.oid = x.indexrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      ORDER BY n.nspname, c.relname, i.relname
+    `);
+    for (const row of indexes.rows) {
+      byRelation.get(qualified(row))?.indexes.push(row.index_name);
+    }
+
+    // Primary key, unique, foreign key, check and exclusion constraints — the ones a
+    // user names and refers to. Trigger and not-null constraints carry generated names.
+    const constraints = await db.query<RelationConstraintRow>(`
+      SELECT n.nspname AS schema_name, c.relname AS table_name, con.conname AS constraint_name
+      FROM pg_constraint con
+      JOIN pg_class c ON c.oid = con.conrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE con.contype IN ('p', 'u', 'f', 'c', 'x')
+        AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+      ORDER BY n.nspname, c.relname, con.conname
+    `);
+    for (const row of constraints.rows) {
+      byRelation.get(qualified(row))?.constraints.push(row.constraint_name);
+    }
+
+    // `unnest(conkey, confkey)` walks the two attnum arrays in lockstep, so a composite
+    // key pairs each of its columns with the one it actually points at.
+    const foreignKeys = await db.query<RelationForeignKeyRow>(`
+      SELECT n.nspname AS schema_name, c.relname AS table_name, con.conname AS constraint_name,
+             att.attname AS column_name, fc.relname AS ref_table_name,
+             fatt.attname AS ref_column_name
+      FROM pg_constraint con
+      JOIN pg_class c ON c.oid = con.conrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_class fc ON fc.oid = con.confrelid
+      JOIN LATERAL unnest(con.conkey, con.confkey) WITH ORDINALITY AS k(attnum, fattnum, ord)
+        ON true
+      JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = k.attnum
+      JOIN pg_attribute fatt ON fatt.attrelid = con.confrelid AND fatt.attnum = k.fattnum
+      WHERE con.contype = 'f'
+        AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+      ORDER BY n.nspname, c.relname, con.conname, k.ord
+    `);
+    for (const row of foreignKeys.rows) {
+      byColumn.get(`${qualified(row)}.${row.column_name}`)?.foreignKeys.push({
+        name: row.constraint_name,
+        references: { table: row.ref_table_name, column: row.ref_column_name },
+      });
+    }
+
+    // The rest of the pipeline keys relations by bare name (as `catalog()` does), so a
+    // table shadowed by a same-named one in another schema collapses onto the last seen.
+    return [...new Map([...byRelation.values()].map((t) => [t.name, t])).values()];
+  }
+
+  return { describe, catalog, columnComments, writableColumns, tables, close: () => db.close() };
 }
+
+const qualified = (row: { schema_name: string; table_name: string }): string =>
+  `${row.schema_name}.${row.table_name}`;
 
 // Dynamic OIDs (enum/domain/array) a static table can't know: read their
 // labels/base/element from the catalog so the mapper can recurse to a leaf.
@@ -184,6 +294,42 @@ interface CommentRow {
 interface WritableRow {
   table_name: string;
   column_name: string;
+}
+
+// `relkind` as the generated module reports it. A partitioned table ('p') is still a
+// table; only a materialized view carries both a view's definition and real indexes.
+const RELATION_KIND: Record<string, RelationKind> = {
+  r: 'table',
+  p: 'table',
+  v: 'view',
+  m: 'materialized_view',
+};
+
+interface RelationColumnRow {
+  schema_name: string;
+  table_name: string;
+  relkind: string;
+  column_name: string;
+  type_oid: number;
+  not_null: boolean;
+}
+
+interface RelationIndexRow {
+  schema_name: string;
+  table_name: string;
+  index_name: string;
+}
+
+interface RelationConstraintRow {
+  schema_name: string;
+  table_name: string;
+  constraint_name: string;
+}
+
+interface RelationForeignKeyRow extends RelationConstraintRow {
+  column_name: string;
+  ref_table_name: string;
+  ref_column_name: string;
 }
 
 interface PgTypeRow {
@@ -305,8 +451,41 @@ function analyzePlan(input: { plan: PlanNode; fieldCount: number }): {
         outerNullable: relations.length > 0 && nonNullableRelations.length === 0,
       };
     }
-    // Functions, OVER(), literals, CASE, casts.
-    return { kind: 'expr', expr };
+    // Functions, OVER(), literals, CASE, casts — and generated columns, which reach the
+    // plan as the expression that generates them.
+    return { kind: 'expr', expr, ...expressionOrigin({ expr, aliasToRel, nullableAliases }) };
   });
   return { provenance, relations };
+}
+
+const QUALIFIED_REF = /\b([a-zA-Z_][\w$]*)\.[a-zA-Z_][\w$]*/g;
+// A quoted literal can hold anything that looks like `alias.column` (`'u.email'::text`),
+// so it is blanked before the scan rather than read as a reference.
+const SQL_STRING = /'(?:[^']|'')*'/g;
+
+/**
+ * The relation an expression reads from, when all of its inputs agree on one.
+ * Postgres qualifies an expression's column references (`uuid_extract_timestamp(a.id)`)
+ * exactly when more than one relation is in scope — which is exactly when matching a
+ * comment override by column name alone would be ambiguous. Names that aren't aliases
+ * in this plan (a schema-qualified function like `paradedb.score(…)`) are ignored.
+ */
+function expressionOrigin(input: {
+  expr: string;
+  aliasToRel: Record<string, string>;
+  nullableAliases: Set<string>;
+}): { relation?: string; outerNullable: boolean } {
+  const scanned = input.expr.replace(SQL_STRING, "''");
+  const aliases = [...new Set([...scanned.matchAll(QUALIFIED_REF)].map((m) => m[1]!))].filter(
+    (alias) => alias in input.aliasToRel,
+  );
+  // Whether any input is on the nullable side is knowable even when the inputs span
+  // several relations — and it has to be reported, or a comment matched by name alone
+  // would type an outer-joined column as non-null.
+  const outerNullable = aliases.some((alias) => input.nullableAliases.has(alias));
+  const relations = [...new Set(aliases.map((alias) => input.aliasToRel[alias]!))];
+  if (relations.length !== 1) {
+    return { outerNullable };
+  }
+  return { relation: relations[0], outerNullable };
 }

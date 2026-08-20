@@ -9,6 +9,7 @@ import type {
   Provenance,
   RawColumnComments,
   ResultField,
+  SchemaTable,
   WritableColumns,
 } from '#types.ts';
 
@@ -75,10 +76,12 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
         fields.push({ name, ts, tsNote: note });
         // A declared type means a real table column; trace it by name (the catalog
         // step resolves the owning relation). No declared type → an expression.
+        // No `relation`: SQLite's metadata never names an expression's inputs. Without
+        // column comments there is no override to disambiguate anyway.
         provenance.push(
           declared
             ? { kind: 'column', column: name, table: null, candidates: relations, outerNullable }
-            : { kind: 'expr', expr: name },
+            : { kind: 'expr', expr: name, outerNullable },
         );
       }
       return Promise.resolve({ fields, provenance, relations });
@@ -87,13 +90,16 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
     }
   }
 
+  // Relation and column names come from the schema, and `__proto__` is a legal one:
+  // on an ordinary object it is the prototype accessor, so `map[name] ??= …` never
+  // assigns and the later `.push`/lookup fails. A null-prototype record has no such key.
   // Per-column NOT NULL, from `PRAGMA table_info`. An `INTEGER PRIMARY KEY` is a
   // rowid alias and implicitly NOT NULL even when `notnull` reads 0.
   function catalog(): Promise<Catalog> {
-    const map: Catalog = {};
-    for (const table of listNames(['table', 'view'])) {
+    const map: Catalog = Object.create(null);
+    for (const { name: table } of listRelations(['table', 'view'])) {
       const cols = db.prepare(`PRAGMA table_info(${quoteIdent(table)})`).all() as TableInfoRow[];
-      map[table] = {};
+      map[table] = Object.create(null);
       for (const c of cols) {
         map[table]![c.name] = c.notnull === 1 || (c.pk > 0 && /INT/i.test(c.type));
       }
@@ -110,22 +116,64 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
   // Writable columns (not generated) for `SET col = col` neutralization. `hidden`
   // from `table_xinfo`: 0 = ordinary, 2 = VIRTUAL, 3 = STORED generated column.
   function writableColumns(): Promise<WritableColumns> {
-    const map: WritableColumns = {};
-    for (const table of listNames(['table'])) {
+    const map: WritableColumns = Object.create(null);
+    for (const { name: table } of listRelations(['table'])) {
       const cols = db.prepare(`PRAGMA table_xinfo(${quoteIdent(table)})`).all() as TableXInfoRow[];
       map[table] = cols.filter((c) => c.hidden === 0).map((c) => c.name);
     }
     return Promise.resolve(map);
   }
 
-  function listNames(kinds: string[]): string[] {
+  // The schema block. `table_xinfo` over `table_info` so generated columns — which the
+  // latter omits — make it into the row shape; `hidden === 1` marks a virtual table's
+  // hidden columns, which aren't selectable by `*` and are left out.
+  function tables(): Promise<SchemaTable[]> {
+    const out = listRelations(['table', 'view']).map((rel): SchemaTable => {
+      const cols = db
+        .prepare(`PRAGMA table_xinfo(${quoteIdent(rel.name)})`)
+        .all() as TableXInfoRow[];
+      const indexes = db
+        .prepare(`PRAGMA index_list(${quoteIdent(rel.name)})`)
+        .all() as IndexListRow[];
+      // SQLite has only these two; `sqlite_master.type` is already filtered to them.
+      const kind = rel.type === 'view' ? 'view' : 'table';
+      return {
+        name: rel.name,
+        kind,
+        columns: cols
+          .filter((c) => c.hidden !== 1)
+          .map((c) => {
+            const { ts, note } = declToTs(c.type);
+            return {
+              name: c.name,
+              ts,
+              tsNote: note,
+              notNull: c.notnull === 1 || (c.pk > 0 && /INT/i.test(c.type)),
+              // `PRAGMA foreign_key_list` knows what each key references but not what it
+              // is called — SQLite catalogues no constraint names — and the whole point
+              // of the map is to key them by an identifier you can put back into SQL.
+              foreignKeys: [],
+            };
+          }),
+        // Sorted, as Postgres' catalog queries are: the emitted unions read the same
+        // way in both dialects, and `--check-stale` never sees incidental reordering.
+        indexes: indexes.map((i) => i.name).sort(),
+        // A view has no constraints to name, whatever its body happens to contain.
+        constraints: kind === 'table' ? parseConstraintNames(rel.sql ?? '').sort() : [],
+      };
+    });
+    return Promise.resolve(out);
+  }
+
+  function listRelations(kinds: string[]): SqliteMasterRow[] {
     const inList = kinds.map((k) => `'${k}'`).join(', ');
-    const rows = db
+    return db
       .prepare(
-        `SELECT name FROM sqlite_master WHERE type IN (${inList}) AND name NOT LIKE 'sqlite_%'`,
+        `SELECT name, type, sql FROM sqlite_master
+         WHERE type IN (${inList}) AND name NOT LIKE 'sqlite_%'
+         ORDER BY name`,
       )
-      .all() as Array<{ name: string }>;
-    return rows.map((r) => r.name);
+      .all() as SqliteMasterRow[];
   }
 
   return {
@@ -133,6 +181,7 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
     catalog,
     columnComments,
     writableColumns,
+    tables,
     close: () => Promise.resolve(db.close()),
   };
 }
@@ -144,9 +193,19 @@ interface TableInfoRow {
   pk: number;
 }
 
-interface TableXInfoRow {
-  name: string;
+interface TableXInfoRow extends TableInfoRow {
   hidden: number;
+}
+
+interface IndexListRow {
+  name: string;
+}
+
+interface SqliteMasterRow {
+  name: string;
+  type: string;
+  /** The `CREATE` statement, `null` for the relations SQLite defines itself. */
+  sql: string | null;
 }
 
 // Read a prepared-statement metadata array, tolerating the getters that throw
@@ -181,6 +240,19 @@ function parseRelations(sql: string): string[] {
   return [...out];
 }
 
+const CONSTRAINT_NAME = new RegExp(String.raw`\bCONSTRAINT\s+(${IDENT})`, 'gi');
+// `sqlite_master.sql` is the statement as written, comments and literals included, and
+// any of those can contain the word CONSTRAINT. Blank them before scanning.
+const DDL_NOISE = /--[^\n]*|\/\*[\s\S]*?\*\/|'(?:[^']|'')*'/g;
+
+// SQLite keeps no catalog of constraint names — only the `CREATE TABLE` text has them.
+// So explicitly named constraints are read from the DDL; the unnamed ones (a bare
+// `PRIMARY KEY` / `CHECK (…)`, every foreign key) have no name to report at all.
+function parseConstraintNames(ddl: string): string[] {
+  const scanned = ddl.replace(DDL_NOISE, ' ');
+  return [...new Set([...scanned.matchAll(CONSTRAINT_NAME)].map((m) => unquoteIdent(m[1]!)))];
+}
+
 function unquoteIdent(s: string): string {
   if (s.startsWith('"') && s.endsWith('"')) {
     return s.slice(1, -1).replace(/""/g, '"');
@@ -211,6 +283,11 @@ function fieldType(input: { declared: string | null; storage: string | null }): 
 
 function declToTs(decl: string): TsType {
   const d = decl.toUpperCase();
+  // A column declared without a type (`CREATE TABLE t (a)`, or a view column SQLite
+  // can't trace back to one) carries no affinity to map.
+  if (!d) {
+    return { ts: 'unknown' };
+  }
   if (d.includes('INT')) {
     return { ts: 'number' };
   }

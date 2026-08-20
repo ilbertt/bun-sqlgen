@@ -2,12 +2,16 @@ import type {
   Catalog,
   ColumnOverride,
   ColumnOverrides,
+  ColumnSource,
   DescribeResult,
+  EmitColumn,
   NullabilityReason,
   Overrides,
   Provenance,
   RawColumnComments,
   ResolvedField,
+  ResultField,
+  SchemaTable,
 } from '#types.ts';
 
 /**
@@ -34,7 +38,13 @@ export function resolveFields(input: {
     // single in-scope relation.
     const comment: ColumnOverride | undefined = source
       ? columnOverrides[source.table]?.[source.column]
-      : commentByName({ name: f.name, relations: described.relations, columnOverrides });
+      : commentByName({
+          name: f.name,
+          // An expression that traced to one relation names its owner; otherwise every
+          // relation in scope is a candidate and only an unambiguous match counts.
+          relations: prov?.kind === 'expr' && prov.relation ? [prov.relation] : described.relations,
+          columnOverrides,
+        });
 
     // A per-query `@type` is the most specific override there is: it names the exact
     // result column and gives its full TS type verbatim (nullability included), so it
@@ -51,9 +61,7 @@ export function resolveFields(input: {
     }
 
     // Type: column-comment `@type` > the introspector's resolved type.
-    const tsType = comment?.tsType;
-    const ts = tsType ?? f.ts;
-    const note = tsType ? undefined : f.tsNote;
+    const { ts, note } = commentType({ base: f, comment });
 
     let nullable: boolean;
     let reason: NullabilityReason;
@@ -66,12 +74,10 @@ export function resolveFields(input: {
     } else if (source && prov?.kind === 'column') {
       // A column comment sets the base nullability (catalog otherwise); outer-join
       // widening still applies on top.
-      const baseNotNull =
-        comment?.notNull === true
-          ? true
-          : comment?.nullable === true
-            ? false
-            : catalog[source.table]?.[source.column] === true;
+      const baseNotNull = commentNotNull({
+        comment,
+        fallback: catalog[source.table]?.[source.column] === true,
+      });
       nullable = !baseNotNull || prov.outerNullable;
       reason =
         comment?.notNull || comment?.nullable
@@ -80,8 +86,10 @@ export function resolveFields(input: {
             ? 'outer-join'
             : 'catalog';
     } else if (comment?.notNull) {
-      nullable = false;
-      reason = 'comment';
+      // A comment describes the column, not the query: pulling it through an outer join
+      // still makes it nullable here.
+      nullable = prov?.outerNullable === true;
+      reason = nullable ? 'outer-join' : 'comment';
     } else if (comment?.nullable) {
       nullable = true;
       reason = 'comment';
@@ -93,8 +101,67 @@ export function resolveFields(input: {
       reason = 'expr';
     }
 
-    return { name: f.name, ts, nullable, reason, note, doc: comment?.doc };
+    return {
+      name: f.name,
+      ts,
+      nullable,
+      reason,
+      note,
+      doc: comment?.doc,
+      source: source ?? undefined,
+    };
   });
+}
+
+/**
+ * The same resolution for a base relation's own columns: a column comment's `@type`
+ * overrides the introspector's type, its `@notNull`/`@nullable` override the schema's,
+ * and its prose becomes the field's JSDoc. No query is in scope here, so there are no
+ * per-query pragmas and no outer-join widening — just the column as the schema declares it.
+ */
+export function resolveTableColumns(input: {
+  table: SchemaTable;
+  columnOverrides: ColumnOverrides;
+}): EmitColumn[] {
+  const overrides = input.columnOverrides[input.table.name] ?? {};
+  return input.table.columns.map((column): EmitColumn => {
+    const comment = overrides[column.name];
+    const { ts, note } = commentType({ base: column, comment });
+    return {
+      name: column.name,
+      ts,
+      nullable: !commentNotNull({ comment, fallback: column.notNull }),
+      reason: comment?.notNull || comment?.nullable ? 'comment' : 'catalog',
+      note,
+      doc: comment?.doc,
+      foreignKeys: column.foreignKeys,
+    };
+  });
+}
+
+// The two resolvers below are the only places a column comment is applied, and they have
+// to agree: the schema block and every query selecting the column must report the same
+// type. Both read the precedence from here rather than restating it.
+
+// A comment's `@type` replaces the introspector's type — and its unmapped-type note with it.
+function commentType(input: { base: ResultField; comment: ColumnOverride | undefined }): {
+  ts: string;
+  note?: string;
+} {
+  const tsType = input.comment?.tsType;
+  return { ts: tsType ?? input.base.ts, note: tsType ? undefined : input.base.tsNote };
+}
+
+// `@notNull`/`@nullable` on a comment override whatever the schema declares.
+function commentNotNull(input: {
+  comment: ColumnOverride | undefined;
+  fallback: boolean;
+}): boolean {
+  return input.comment?.notNull === true
+    ? true
+    : input.comment?.nullable === true
+      ? false
+      : input.fallback;
 }
 
 // A comment override for a field name owned by exactly one in-scope relation.
@@ -112,7 +179,7 @@ function commentByName(input: {
 function resolveSource(input: {
   prov: Provenance | undefined;
   catalog: Catalog;
-}): { table: string; column: string } | null {
+}): ColumnSource | null {
   const { prov, catalog } = input;
   if (prov?.kind !== 'column') {
     return null;
@@ -177,12 +244,12 @@ export function parseColumnComment(text: string): ColumnOverride {
 
 // Parse every column comment; keep any that carries a marker or documentation.
 export function parseColumnComments(raw: RawColumnComments): ColumnOverrides {
-  const out: ColumnOverrides = {};
+  const out: ColumnOverrides = Object.create(null);
   for (const [table, columns] of Object.entries(raw)) {
     for (const [column, text] of Object.entries(columns)) {
       const override = parseColumnComment(text);
       if (override.notNull || override.nullable || override.tsType || override.doc) {
-        out[table] ??= {};
+        out[table] ??= Object.create(null);
         out[table]![column] = override;
       }
     }

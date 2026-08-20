@@ -80,6 +80,51 @@ await sql.begin(async (tx) => {
 });
 ```
 
+## Schema types
+
+The generated file also describes every table and view — its columns, and the names of
+its indexes and constraints:
+
+```ts
+import type { DatabaseTables } from '@ilbertt/bun-sqlgen';
+
+type UserRow = DatabaseTables['users']['columns'];
+type UserIndex = DatabaseTables['users']['indexes']; // 'users_pkey' | 'users_email_idx'
+```
+
+The same names are emitted as values, so an identifier can be reached at runtime and
+still be checked — a name that doesn't exist won't compile:
+
+```ts
+import { schema } from './queries.gen.ts';
+
+schema.users._relationName; // 'users'
+schema.users._relationType; // 'table' | 'view' | 'materialized_view'
+schema.users._columns.email._columnName; // 'email'
+schema.users._constraints.users_pkey._constraintName; // 'users_pkey'
+schema.users._columns.nope; // compile error
+```
+
+Foreign keys hang off the column they constrain, so a reference can be followed without
+knowing the constraint's name first. A composite key appears on each of its columns,
+paired with the column that one points at:
+
+```ts
+const fk = schema.deals._columns.user_id._foreignKeys.deals_user_id_fkey;
+fk._references._relationName; // 'users'
+fk._references._columnName; // 'id'
+```
+
+Every node is an object carrying its own `_…Name` rather than being the bare string, so
+detail can be added later — a column's foreign keys, an index's columns — without
+changing how an identifier is read.
+
+Columns are typed like the query results are, and a result field that traces to a base
+column references it (`email: IUsersColumns['email']`) rather than repeating its type.
+View columns are all nullable — nothing tracks `NOT NULL` through a view definition.
+
+`--no-schema` (or `schema: false` in `sqlgen.config.ts`) leaves the block out.
+
 ## CLI
 
 ```sh
@@ -139,6 +184,9 @@ stored text, not a `Date`).
 - **No column comments.** The schema-level overrides via `COMMENT ON COLUMN` are
   Postgres-only; the per-query `@notNull`/`@nullable`/`@type` pragmas work in both
   dialects.
+- **Constraint names are partial.** SQLite catalogues none, so the schema block lists
+  only the ones the DDL names explicitly, and `_foreignKeys` is always empty — SQLite
+  knows what a key references but not what it is called. Index names are complete.
 
 A runnable example lives in the
 [`sqlite` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/sqlite).
