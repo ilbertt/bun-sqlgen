@@ -53,7 +53,9 @@ Releases are automated and driven by Conventional Commits:
 
 ## Bun version
 
-The Bun version is pinned in `.bun-version`. When bumping it, also update `engines.bun` in `packages/bun-sqlgen/pkg/package.json` so the published package advertises the matching minimum.
+The Bun version is pinned in `.bun-version` — the version the repo develops and builds against. Keep `packageManager` in the root `package.json` in sync with it.
+
+`engines.bun` in `packages/bun-sqlgen/pkg/package.json` is a separate decision: it's the oldest Bun the published package still runs on, not the version we build with. Raise it only when the package actually depends on a newer runtime — bumping it in lockstep with `.bun-version` drops users who could otherwise install fine.
 
 ## Pull requests
 
