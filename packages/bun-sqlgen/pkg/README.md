@@ -51,7 +51,7 @@ bun add @ilbertt/bun-sqlgen
    bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations
    ```
 
-   This writes `src/queries.gen.d.ts` — commit it alongside your code. With it in
+   This writes `src/queries.gen.ts` — commit it alongside your code. With it in
    place, `user.whatever` is a compile error and `user.display_name.length` is flagged
    as possibly-null, all by plain `tsc`.
 
@@ -95,7 +95,7 @@ non-zero on a problem:
   schema and fail on any that don't (a missing column, a renamed table, a bad cast).
   No types generated, no Docker, no running database — reach for it even if you only
   want CI to guard that your raw SQL still matches the schema.
-- **`--check-stale`** — fail if the committed `queries.gen.d.ts` is out of date.
+- **`--check-stale`** — fail if the committed `queries.gen.ts` is out of date.
 - **`--check`** — run both; the one-flag CI default.
 
 Commit the generated file and run `--check` in CI so an edited query can never

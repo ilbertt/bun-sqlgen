@@ -15,4 +15,4 @@ pass is the real gate (`check:types` runs it before `tsc`).
 Break a query — select a column that doesn't exist — and `check:queries` fails with
 the real Postgres error, pointing at the file and line. `--check-queries` ignores
 output freshness entirely; the sibling `--check-stale` (or `--check` for both) is
-what guards a committed `queries.gen.d.ts` in the typed lane.
+what guards a committed `queries.gen.ts` in the typed lane.

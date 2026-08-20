@@ -16,7 +16,7 @@ export const command = defineCommand('generate [glob]', {
     },
     out: {
       schema: z.string().optional(),
-      description: 'Output path for the generated module (default src/queries.gen.d.ts).',
+      description: 'Output path for the generated module (default src/queries.gen.ts).',
     },
     package: {
       schema: z.string().optional(),

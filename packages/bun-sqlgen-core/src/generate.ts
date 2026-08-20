@@ -1,24 +1,21 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createDiscoverer } from '#discover.ts';
-import { emitModule } from '#emit/index.ts';
+import { emitModule, GENERATED_MARKER } from '#emit/index.ts';
 import { createIntrospector } from '#introspect/index.ts';
 import { parseColumnComments, parseOverrides, resolveFields } from '#nullability.ts';
 import type { Dialect, DiscoveredQuery, EmitModel, IntrospectorOptions } from '#types.ts';
 
 type LoadedConfig = Partial<Omit<IntrospectorOptions, 'migrationsDir'>>;
 
-// Where the aggregated module lands when `--out` is omitted.
-const DEFAULT_OUT = 'src/queries.gen.d.ts';
+// Where the aggregated module lands when `--out` is omitted. A `.ts`, not a `.d.ts`:
+// the module is a normal source file, so it can carry values as well as types.
+const DEFAULT_OUT = 'src/queries.gen.ts';
 
 // The package whose `QueryResults` registry the generated `declare module` augments.
 // Real users import `withTypes` from here; override with `--package` (e.g. a workspace alias).
 const DEFAULT_PACKAGE = '@ilbertt/bun-sqlgen';
-
-// Our own output, never fed back in as a query source: the aggregated module
-// (`*.gen.ts`) and any legacy per-file siblings (`*.gen.d.ts`).
-const isGenerated = (f: string): boolean => f.endsWith('.gen.ts') || f.endsWith('.gen.d.ts');
 
 export interface GenerateOptions {
   /** Glob(s) for query source files, e.g. `src/**\/*.ts`. Relative to `cwd`. */
@@ -31,7 +28,7 @@ export interface GenerateOptions {
   checkStale?: boolean;
   /** Explicit path to `sqlgen.config.{ts,js,mjs}`; auto-discovered otherwise. */
   configPath?: string;
-  /** Output path for the aggregated module, relative to `cwd`. Defaults to `src/queries.gen.d.ts`. */
+  /** Output path for the aggregated module, relative to `cwd`. Defaults to `src/queries.gen.ts`. */
   out?: string;
   /** Package whose `QueryResults` registry to augment. Defaults to `@ilbertt/bun-sqlgen`. */
   packageName?: string;
@@ -77,8 +74,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   const migrationsDir = resolve(cwd, options.migrations);
   const outPath = resolve(cwd, options.out ?? DEFAULT_OUT);
 
-  // Resolve the query globs; skip our own generated output (the aggregated module
-  // and any legacy per-file siblings).
+  // Resolve the query globs; skip our own generated output.
   const globs = Array.isArray(options.queries) ? options.queries : [options.queries];
   const matched = new Set<string>();
   for (const pattern of globs) {
@@ -181,6 +177,9 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
         console.error(`would change: ${relative(cwd, outPath)}`);
       }
     }
+    if (dropSuperseded({ outPath, cwd, write: writeOutput })) {
+      changed = true;
+    }
   }
 
   if (checkStale && changed) {
@@ -236,6 +235,36 @@ async function loadConfig(input: { root: string; explicit?: string }): Promise<L
     default?: LoadedConfig;
   } & LoadedConfig;
   return mod.default ?? mod;
+}
+
+/**
+ * Remove the `.d.ts` this `.gen.ts` output replaced. Left in place it stays in the
+ * program and contributes a second `declare module` augmentation from a stale registry
+ * — which TypeScript accepts silently rather than flagging, so the old shape can quietly
+ * win. Only ever removes a file carrying our own generated header.
+ */
+function dropSuperseded(input: { outPath: string; cwd: string; write: boolean }): boolean {
+  const { outPath, cwd, write } = input;
+  if (!outPath.endsWith('.gen.ts')) {
+    return false;
+  }
+  const superseded = `${outPath.slice(0, -'.ts'.length)}.d.ts`;
+  if (!safeRead(superseded)?.includes(GENERATED_MARKER)) {
+    return false;
+  }
+  const at = relative(cwd, superseded);
+  if (write) {
+    rmSync(superseded);
+    console.log(`removed superseded ${at}`);
+  } else {
+    console.error(`would remove: ${at}`);
+  }
+  return true;
+}
+
+// Our own output, never fed back in as a query source.
+function isGenerated(file: string): boolean {
+  return file.endsWith('.gen.ts');
 }
 
 function firstLine(e: unknown): string {
