@@ -6,7 +6,7 @@ result interfaces. Same as the [`simple`](../simple) example, but the client is
 `new SQL('sqlite://:memory:')` and codegen introspects with `--dialect sqlite` (via
 `bun:sqlite`). The inline comments call out SQLite-specific behavior — `BOOLEAN` /
 `BIGINT` → `number`, `DATETIME` → `string`, and the conservative outer-join
-nullability that `@notNull` recovers. The generated `queries.gen.d.ts` is committed
+nullability that `@notNull` recovers. The generated `queries.gen.ts` is committed
 so `tsc` passes without a DB.
 
 ## What SQLite trades off vs Postgres

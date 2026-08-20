@@ -11,7 +11,7 @@ consumed as source via its `exports`.
 discover sql.Name`...` tags (TS AST)
   → describe against the dialect's engine (validity, result types, provenance)
   → resolve nullability (catalog + outer-join widening + overrides)
-  → emit queries.gen.d.ts
+  → emit queries.gen.ts
 ```
 
 The describe step runs against a dialect-specific introspector under `introspect/`,

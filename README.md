@@ -47,7 +47,7 @@ bun add @ilbertt/bun-sqlgen
    bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations
    ```
 
-   This writes `src/queries.gen.d.ts` — commit it. With it in place, `user.whatever` is
+   This writes `src/queries.gen.ts` — commit it. With it in place, `user.whatever` is
    a compile error and `user.display_name.length` is flagged as possibly-null, all by
    plain `tsc`.
 
