@@ -17,10 +17,6 @@ const DEFAULT_OUT = 'src/queries.gen.ts';
 // Real users import `withTypes` from here; override with `--package` (e.g. a workspace alias).
 const DEFAULT_PACKAGE = '@ilbertt/bun-sqlgen';
 
-// Our own output, never fed back in as a query source: the aggregated module
-// (`*.gen.ts`) and the `*.gen.d.ts` it superseded.
-const isGenerated = (f: string): boolean => f.endsWith('.gen.ts') || f.endsWith('.gen.d.ts');
-
 export interface GenerateOptions {
   /** Glob(s) for query source files, e.g. `src/**\/*.ts`. Relative to `cwd`. */
   queries: string | string[];
@@ -264,6 +260,11 @@ function dropSuperseded(input: { outPath: string; cwd: string; write: boolean })
     console.error(`would remove: ${at}`);
   }
   return true;
+}
+
+// Our own output, never fed back in as a query source.
+function isGenerated(file: string): boolean {
+  return file.endsWith('.gen.ts');
 }
 
 function firstLine(e: unknown): string {
