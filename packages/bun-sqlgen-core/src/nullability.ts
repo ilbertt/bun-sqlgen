@@ -4,6 +4,7 @@ import type {
   ColumnOverrides,
   ColumnSource,
   DescribeResult,
+  EmitColumn,
   NullabilityReason,
   Overrides,
   Provenance,
@@ -121,9 +122,9 @@ export function resolveFields(input: {
 export function resolveTableColumns(input: {
   table: SchemaTable;
   columnOverrides: ColumnOverrides;
-}): ResolvedField[] {
+}): EmitColumn[] {
   const overrides = input.columnOverrides[input.table.name] ?? {};
-  return input.table.columns.map((column): ResolvedField => {
+  return input.table.columns.map((column): EmitColumn => {
     const comment = overrides[column.name];
     const { ts, note } = commentType({ base: column, comment });
     return {
@@ -133,6 +134,7 @@ export function resolveTableColumns(input: {
       reason: comment?.notNull || comment?.nullable ? 'comment' : 'catalog',
       note,
       doc: comment?.doc,
+      foreignKeys: column.foreignKeys,
     };
   });
 }

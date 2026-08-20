@@ -65,12 +65,12 @@ export const schema = {
         _relationName: "articles",
         _relationType: "table",
         _columns: {
-            id: { _columnName: "id" },
-            author_id: { _columnName: "author_id" },
-            slug: { _columnName: "slug" },
-            title: { _columnName: "title" },
-            body: { _columnName: "body" },
-            created_by: { _columnName: "created_by" }
+            id: { _columnName: "id", _foreignKeys: {} },
+            author_id: { _columnName: "author_id", _foreignKeys: { articles_author_id_fkey: { _constraintName: "articles_author_id_fkey", _references: { _relationName: "authors", _columnName: "id" } } } },
+            slug: { _columnName: "slug", _foreignKeys: {} },
+            title: { _columnName: "title", _foreignKeys: {} },
+            body: { _columnName: "body", _foreignKeys: {} },
+            created_by: { _columnName: "created_by", _foreignKeys: {} }
         },
         _indexes: {
             articles_author_idx: { _indexName: "articles_author_idx" },
@@ -88,9 +88,9 @@ export const schema = {
         _relationName: "authors",
         _relationType: "table",
         _columns: {
-            id: { _columnName: "id" },
-            email: { _columnName: "email" },
-            name: { _columnName: "name" }
+            id: { _columnName: "id", _foreignKeys: {} },
+            email: { _columnName: "email", _foreignKeys: {} },
+            name: { _columnName: "name", _foreignKeys: {} }
         },
         _indexes: {
             authors_email_key: { _indexName: "authors_email_key" },

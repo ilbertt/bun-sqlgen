@@ -105,6 +105,16 @@ schema.users._constraints.users_pkey._constraintName; // 'users_pkey'
 schema.users._columns.nope; // compile error
 ```
 
+Foreign keys hang off the column they constrain, so a reference can be followed without
+knowing the constraint's name first. A composite key appears on each of its columns,
+paired with the column that one points at:
+
+```ts
+const fk = schema.deals._columns.user_id._foreignKeys.deals_user_id_fkey;
+fk._references._relationName; // 'users'
+fk._references._columnName; // 'id'
+```
+
 Every node is an object carrying its own `_…Name` rather than being the bare string, so
 detail can be added later — a column's foreign keys, an index's columns — without
 changing how an identifier is read.
@@ -175,7 +185,8 @@ stored text, not a `Date`).
   Postgres-only; the per-query `@notNull`/`@nullable`/`@type` pragmas work in both
   dialects.
 - **Constraint names are partial.** SQLite catalogues none, so the schema block lists
-  only the ones the DDL names explicitly. Index names are complete.
+  only the ones the DDL names explicitly, and `_foreignKeys` is always empty — SQLite
+  knows what a key references but not what it is called. Index names are complete.
 
 A runnable example lives in the
 [`sqlite` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/sqlite).

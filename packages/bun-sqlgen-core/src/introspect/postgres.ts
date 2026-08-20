@@ -10,6 +10,7 @@ import type {
   RawColumnComments,
   RelationKind,
   ResultField,
+  SchemaColumn,
   SchemaTable,
   TypeCatalog,
   TypeInfo,
@@ -139,6 +140,7 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
       ORDER BY n.nspname, c.relname, a.attnum
     `);
     const byRelation = new Map<string, SchemaTable>();
+    const byColumn = new Map<string, SchemaColumn>();
     for (const row of cols.rows) {
       let table = byRelation.get(qualified(row));
       if (!table) {
@@ -152,7 +154,15 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
         byRelation.set(qualified(row), table);
       }
       const { ts, note } = oidToTs({ oid: Number(row.type_oid), types });
-      table.columns.push({ name: row.column_name, ts, tsNote: note, notNull: row.not_null });
+      const column: SchemaColumn = {
+        name: row.column_name,
+        ts,
+        tsNote: note,
+        notNull: row.not_null,
+        foreignKeys: [],
+      };
+      table.columns.push(column);
+      byColumn.set(`${qualified(row)}.${row.column_name}`, column);
     }
 
     const indexes = await db.query<RelationIndexRow>(`
@@ -181,6 +191,31 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
     `);
     for (const row of constraints.rows) {
       byRelation.get(qualified(row))?.constraints.push(row.constraint_name);
+    }
+
+    // `unnest(conkey, confkey)` walks the two attnum arrays in lockstep, so a composite
+    // key pairs each of its columns with the one it actually points at.
+    const foreignKeys = await db.query<RelationForeignKeyRow>(`
+      SELECT n.nspname AS schema_name, c.relname AS table_name, con.conname AS constraint_name,
+             att.attname AS column_name, fc.relname AS ref_table_name,
+             fatt.attname AS ref_column_name
+      FROM pg_constraint con
+      JOIN pg_class c ON c.oid = con.conrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_class fc ON fc.oid = con.confrelid
+      JOIN LATERAL unnest(con.conkey, con.confkey) WITH ORDINALITY AS k(attnum, fattnum, ord)
+        ON true
+      JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = k.attnum
+      JOIN pg_attribute fatt ON fatt.attrelid = con.confrelid AND fatt.attnum = k.fattnum
+      WHERE con.contype = 'f'
+        AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+      ORDER BY n.nspname, c.relname, con.conname, k.ord
+    `);
+    for (const row of foreignKeys.rows) {
+      byColumn.get(`${qualified(row)}.${row.column_name}`)?.foreignKeys.push({
+        name: row.constraint_name,
+        references: { table: row.ref_table_name, column: row.ref_column_name },
+      });
     }
 
     // The rest of the pipeline keys relations by bare name (as `catalog()` does), so a
@@ -289,6 +324,12 @@ interface RelationConstraintRow {
   schema_name: string;
   table_name: string;
   constraint_name: string;
+}
+
+interface RelationForeignKeyRow extends RelationConstraintRow {
+  column_name: string;
+  ref_table_name: string;
+  ref_column_name: string;
 }
 
 interface PgTypeRow {

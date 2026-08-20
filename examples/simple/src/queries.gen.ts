@@ -194,6 +194,36 @@ export interface IPaymentsTable {
     constraints: keyof (typeof schema)["payments"]["_constraints"];
 }
 
+/** Columns of `tenant_notes`. */
+export interface ITenantNotesColumns {
+    id: string;
+    region: string;
+    code: string;
+    body: string | null;
+}
+
+/** Schema of `tenant_notes`. */
+export interface ITenantNotesTable {
+    columns: ITenantNotesColumns;
+    relationType: (typeof schema)["tenant_notes"]["_relationType"];
+    indexes: keyof (typeof schema)["tenant_notes"]["_indexes"];
+    constraints: keyof (typeof schema)["tenant_notes"]["_constraints"];
+}
+
+/** Columns of `tenants`. */
+export interface ITenantsColumns {
+    region: string;
+    code: string;
+}
+
+/** Schema of `tenants`. */
+export interface ITenantsTable {
+    columns: ITenantsColumns;
+    relationType: (typeof schema)["tenants"]["_relationType"];
+    indexes: keyof (typeof schema)["tenants"]["_indexes"];
+    constraints: keyof (typeof schema)["tenants"]["_constraints"];
+}
+
 /** Columns of `users`. */
 export interface IUsersColumns {
     id: string;
@@ -218,12 +248,12 @@ export const schema = {
         _relationName: "deal_details",
         _relationType: "view",
         _columns: {
-            deal_id: { _columnName: "deal_id" },
-            status: { _columnName: "status" },
-            amount: { _columnName: "amount" },
-            email: { _columnName: "email" },
-            display_name: { _columnName: "display_name" },
-            status_upper: { _columnName: "status_upper" }
+            deal_id: { _columnName: "deal_id", _foreignKeys: {} },
+            status: { _columnName: "status", _foreignKeys: {} },
+            amount: { _columnName: "amount", _foreignKeys: {} },
+            email: { _columnName: "email", _foreignKeys: {} },
+            display_name: { _columnName: "display_name", _foreignKeys: {} },
+            status_upper: { _columnName: "status_upper", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
@@ -232,12 +262,12 @@ export const schema = {
         _relationName: "deal_meta",
         _relationType: "table",
         _columns: {
-            id: { _columnName: "id" },
-            deal_id: { _columnName: "deal_id" },
-            stage: { _columnName: "stage" },
-            tags: { _columnName: "tags" },
-            details: { _columnName: "details" },
-            scores: { _columnName: "scores" }
+            id: { _columnName: "id", _foreignKeys: {} },
+            deal_id: { _columnName: "deal_id", _foreignKeys: { deal_meta_deal_id_fkey: { _constraintName: "deal_meta_deal_id_fkey", _references: { _relationName: "deals", _columnName: "id" } } } },
+            stage: { _columnName: "stage", _foreignKeys: {} },
+            tags: { _columnName: "tags", _foreignKeys: {} },
+            details: { _columnName: "details", _foreignKeys: {} },
+            scores: { _columnName: "scores", _foreignKeys: {} }
         },
         _indexes: {
             deal_meta_pkey: { _indexName: "deal_meta_pkey" }
@@ -251,11 +281,11 @@ export const schema = {
         _relationName: "deals",
         _relationType: "table",
         _columns: {
-            id: { _columnName: "id" },
-            user_id: { _columnName: "user_id" },
-            amount: { _columnName: "amount" },
-            status: { _columnName: "status" },
-            search_key: { _columnName: "search_key" }
+            id: { _columnName: "id", _foreignKeys: {} },
+            user_id: { _columnName: "user_id", _foreignKeys: { deals_user_id_fkey: { _constraintName: "deals_user_id_fkey", _references: { _relationName: "users", _columnName: "id" } } } },
+            amount: { _columnName: "amount", _foreignKeys: {} },
+            status: { _columnName: "status", _foreignKeys: {} },
+            search_key: { _columnName: "search_key", _foreignKeys: {} }
         },
         _indexes: {
             deals_pkey: { _indexName: "deals_pkey" }
@@ -269,10 +299,10 @@ export const schema = {
         _relationName: "payments",
         _relationType: "table",
         _columns: {
-            id: { _columnName: "id" },
-            deal_id: { _columnName: "deal_id" },
-            amount: { _columnName: "amount" },
-            paid_at: { _columnName: "paid_at" }
+            id: { _columnName: "id", _foreignKeys: {} },
+            deal_id: { _columnName: "deal_id", _foreignKeys: { payments_deal_id_fkey: { _constraintName: "payments_deal_id_fkey", _references: { _relationName: "deals", _columnName: "id" } } } },
+            amount: { _columnName: "amount", _foreignKeys: {} },
+            paid_at: { _columnName: "paid_at", _foreignKeys: {} }
         },
         _indexes: {
             payments_pkey: { _indexName: "payments_pkey" }
@@ -282,16 +312,47 @@ export const schema = {
             payments_pkey: { _constraintName: "payments_pkey" }
         }
     },
+    tenant_notes: {
+        _relationName: "tenant_notes",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            region: { _columnName: "region", _foreignKeys: { tenant_notes_tenant_fkey: { _constraintName: "tenant_notes_tenant_fkey", _references: { _relationName: "tenants", _columnName: "region" } } } },
+            code: { _columnName: "code", _foreignKeys: { tenant_notes_tenant_fkey: { _constraintName: "tenant_notes_tenant_fkey", _references: { _relationName: "tenants", _columnName: "code" } } } },
+            body: { _columnName: "body", _foreignKeys: {} }
+        },
+        _indexes: {
+            tenant_notes_pkey: { _indexName: "tenant_notes_pkey" }
+        },
+        _constraints: {
+            tenant_notes_pkey: { _constraintName: "tenant_notes_pkey" },
+            tenant_notes_tenant_fkey: { _constraintName: "tenant_notes_tenant_fkey" }
+        }
+    },
+    tenants: {
+        _relationName: "tenants",
+        _relationType: "table",
+        _columns: {
+            region: { _columnName: "region", _foreignKeys: {} },
+            code: { _columnName: "code", _foreignKeys: {} }
+        },
+        _indexes: {
+            tenants_pkey: { _indexName: "tenants_pkey" }
+        },
+        _constraints: {
+            tenants_pkey: { _constraintName: "tenants_pkey" }
+        }
+    },
     users: {
         _relationName: "users",
         _relationType: "table",
         _columns: {
-            id: { _columnName: "id" },
-            email: { _columnName: "email" },
-            display_name: { _columnName: "display_name" },
-            created_at: { _columnName: "created_at" },
-            updated_at: { _columnName: "updated_at" },
-            search_key: { _columnName: "search_key" }
+            id: { _columnName: "id", _foreignKeys: {} },
+            email: { _columnName: "email", _foreignKeys: {} },
+            display_name: { _columnName: "display_name", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            search_key: { _columnName: "search_key", _foreignKeys: {} }
         },
         _indexes: {
             users_pkey: { _indexName: "users_pkey" }
@@ -307,6 +368,8 @@ export interface Tables {
     deal_meta: IDealMetaTable;
     deals: IDealsTable;
     payments: IPaymentsTable;
+    tenant_notes: ITenantNotesTable;
+    tenants: ITenantsTable;
     users: IUsersTable;
 }
 

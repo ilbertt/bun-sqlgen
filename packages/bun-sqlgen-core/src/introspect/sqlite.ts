@@ -149,6 +149,10 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
               ts,
               tsNote: note,
               notNull: c.notnull === 1 || (c.pk > 0 && /INT/i.test(c.type)),
+              // `PRAGMA foreign_key_list` knows what each key references but not what it
+              // is called — SQLite catalogues no constraint names — and the whole point
+              // of the map is to key them by an identifier you can put back into SQL.
+              foreignKeys: [],
             };
           }),
         // Sorted, as Postgres' catalog queries are: the emitted unions read the same

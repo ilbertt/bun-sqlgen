@@ -9,7 +9,7 @@ import {
   typeNode,
   valuePropertyName,
 } from '#emit/ast.ts';
-import type { EmitModel, EmitTable, ResolvedField } from '#types.ts';
+import type { ColumnForeignKey, EmitColumn, EmitModel, EmitTable, ResolvedField } from '#types.ts';
 
 // The registry interfaces the generated module emits; names must match what
 // `@ilbertt/bun-sqlgen` declares. `REGISTRY`/`TABLE_REGISTRY` are the exported,
@@ -203,6 +203,40 @@ function nodeMap(input: { names: string[]; nameKey: string }): ts.Expression {
   );
 }
 
+// `{ deal_id: { _columnName: "deal_id", _foreignKeys: { … } } }`. Column nodes carry
+// more than a name, so they don't go through `nodeMap`.
+function columnNodes(columns: EmitColumn[]): ts.Expression {
+  const references = (fk: ColumnForeignKey): ts.Expression =>
+    f.createObjectLiteralExpression([
+      f.createPropertyAssignment('_relationName', f.createStringLiteral(fk.references.table)),
+      f.createPropertyAssignment('_columnName', f.createStringLiteral(fk.references.column)),
+    ]);
+  const foreignKeys = (column: EmitColumn): ts.Expression =>
+    f.createObjectLiteralExpression(
+      column.foreignKeys.map((fk) =>
+        f.createPropertyAssignment(
+          valuePropertyName(fk.name),
+          f.createObjectLiteralExpression([
+            f.createPropertyAssignment('_constraintName', f.createStringLiteral(fk.name)),
+            f.createPropertyAssignment('_references', references(fk)),
+          ]),
+        ),
+      ),
+    );
+  return f.createObjectLiteralExpression(
+    columns.map((column) =>
+      f.createPropertyAssignment(
+        valuePropertyName(column.name),
+        f.createObjectLiteralExpression([
+          f.createPropertyAssignment('_columnName', f.createStringLiteral(column.name)),
+          f.createPropertyAssignment('_foreignKeys', foreignKeys(column)),
+        ]),
+      ),
+    ),
+    true,
+  );
+}
+
 /**
  * `export const schema = { … } as const` — the schema as values, so an identifier can
  * be reached at runtime and still be checked: `schema.payments._columns.id._columnName`
@@ -214,10 +248,7 @@ function schemaValue(tables: EmitTable[]): ts.VariableStatement {
       [
         f.createPropertyAssignment('_relationName', f.createStringLiteral(table.name)),
         f.createPropertyAssignment('_relationType', f.createStringLiteral(table.kind)),
-        f.createPropertyAssignment(
-          '_columns',
-          nodeMap({ names: table.columns.map((c) => c.name), nameKey: '_columnName' }),
-        ),
+        f.createPropertyAssignment('_columns', columnNodes(table.columns)),
         f.createPropertyAssignment(
           '_indexes',
           nodeMap({ names: table.indexes, nameKey: '_indexName' }),

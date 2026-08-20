@@ -109,11 +109,11 @@ export const schema = {
         _relationName: "deal_details",
         _relationType: "view",
         _columns: {
-            deal_id: { _columnName: "deal_id" },
-            status: { _columnName: "status" },
-            amount: { _columnName: "amount" },
-            email: { _columnName: "email" },
-            display_name: { _columnName: "display_name" }
+            deal_id: { _columnName: "deal_id", _foreignKeys: {} },
+            status: { _columnName: "status", _foreignKeys: {} },
+            amount: { _columnName: "amount", _foreignKeys: {} },
+            email: { _columnName: "email", _foreignKeys: {} },
+            display_name: { _columnName: "display_name", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
@@ -122,13 +122,13 @@ export const schema = {
         _relationName: "deals",
         _relationType: "table",
         _columns: {
-            id: { _columnName: "id" },
-            user_id: { _columnName: "user_id" },
-            amount: { _columnName: "amount" },
-            status: { _columnName: "status" },
-            is_active: { _columnName: "is_active" },
-            closed_at: { _columnName: "closed_at" },
-            attachment: { _columnName: "attachment" }
+            id: { _columnName: "id", _foreignKeys: {} },
+            user_id: { _columnName: "user_id", _foreignKeys: {} },
+            amount: { _columnName: "amount", _foreignKeys: {} },
+            status: { _columnName: "status", _foreignKeys: {} },
+            is_active: { _columnName: "is_active", _foreignKeys: {} },
+            closed_at: { _columnName: "closed_at", _foreignKeys: {} },
+            attachment: { _columnName: "attachment", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
@@ -137,10 +137,10 @@ export const schema = {
         _relationName: "users",
         _relationType: "table",
         _columns: {
-            id: { _columnName: "id" },
-            email: { _columnName: "email" },
-            display_name: { _columnName: "display_name" },
-            created_at: { _columnName: "created_at" }
+            id: { _columnName: "id", _foreignKeys: {} },
+            email: { _columnName: "email", _foreignKeys: {} },
+            display_name: { _columnName: "display_name", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}

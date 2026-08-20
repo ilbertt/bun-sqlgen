@@ -24,9 +24,20 @@ export interface ResultField {
   tsNote?: string;
 }
 
+/**
+ * A foreign key as it applies to one of its columns. A composite key appears once on
+ * each column it spans, paired with the column that column points at.
+ */
+export interface ColumnForeignKey {
+  /** The constraint's name — the identifier `DROP CONSTRAINT` takes. */
+  name: string;
+  references: { table: string; column: string };
+}
+
 /** A base relation's column as the introspector reports it, before overrides. */
 export interface SchemaColumn extends ResultField {
   notNull: boolean;
+  foreignKeys: ColumnForeignKey[];
 }
 
 /** What a relation is. Postgres partitioned tables report as `table`; SQLite has no matviews. */
@@ -149,7 +160,12 @@ export interface EmitModel {
   resultFields: ResolvedField[];
 }
 
-export type EmitTable = Table<ResolvedField>;
+/** A resolved column plus the schema facts the emitter reports alongside its type. */
+export interface EmitColumn extends ResolvedField {
+  foreignKeys: ColumnForeignKey[];
+}
+
+export type EmitTable = Table<EmitColumn>;
 
 /** Which engine introspects the migrations at build time. Defaults to `postgres`. */
 export type Dialect = 'postgres' | 'sqlite';
