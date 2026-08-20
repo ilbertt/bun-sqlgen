@@ -6,7 +6,7 @@
     "build": "bun run --bun turbo build",
     "check:types": "bun run --bun turbo check:types",
     "check:codestyle": "bun run --bun biome check",
-    "check:all": "bun check:types && bun check:codestyle",
+    "check:all": "bun run --parallel --no-exit-on-error check:types check:codestyle",
     "check:commit-message": "bun run --bun commitlint",
     "fix:codestyle": "bun run --bun biome check --write"
   },
@@ -33,5 +33,5 @@
     "typescript": "catalog:",
     "turbo": "^2.10.4"
   },
-  "packageManager": "bun@1.3.14"
+  "packageManager": "bun@1.4.0"
 }
