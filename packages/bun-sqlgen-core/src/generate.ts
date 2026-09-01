@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { createDiscoverer } from '#discover.ts';
 import { emitModule, GENERATED_MARKER } from '#emit/index.ts';
 import { createIntrospector } from '#introspect/index.ts';
+import { requireOrderedMigrations } from '#introspect/migrations.ts';
 import {
   parseColumnComments,
   parseOverrides,
@@ -19,7 +20,7 @@ import type {
 } from '#types.ts';
 
 type LoadedConfig = Partial<Omit<IntrospectorOptions, 'migrationsDir'>> &
-  Pick<GenerateOptions, 'schema'>;
+  Pick<GenerateOptions, 'schema' | 'checkMigrationOrder'>;
 
 // Where the aggregated module lands when `--out` is omitted. A `.ts`, not a `.d.ts`:
 // the module is a normal source file, so it can carry values as well as types.
@@ -38,6 +39,14 @@ export interface GenerateOptions {
   checkQueries?: boolean;
   /** Fail if the committed generated module is out of date. Read-only (no write). */
   checkStale?: boolean;
+  /**
+   * Fail unless every migration filename carries a unique sequence prefix, all of one
+   * width — what makes filename order (the order they apply in) the intended one.
+   * Overrides config; absent from both, the check doesn't run. Unlike the other checks
+   * it guards generation itself, so it runs in every mode rather than replacing the
+   * write.
+   */
+  checkMigrationOrder?: MigrationOrderCheck;
   /** Explicit path to `sqlgen.config.{ts,js,mjs}`; auto-discovered otherwise. */
   configPath?: string;
   /** Output path for the aggregated module, relative to `cwd`. Defaults to `src/queries.gen.ts`. */
@@ -53,6 +62,17 @@ export interface GenerateOptions {
    * constraint names. Overrides config; defaults to `true`.
    */
   schema?: boolean;
+}
+
+/** Settings for the migration-order check; its presence is what turns the check on. */
+export interface MigrationOrderCheck {
+  /**
+   * What identifies a filename's sequence prefix — the part that has to be unique and
+   * equally wide across every migration. Not defaulted: only you know which convention
+   * your filenames were named for. `/^\d+/` matches `0001_init.sql`, `/^\d{14}_/` a
+   * timestamp scheme, `/^[a-z]{4}_/` a lettered one.
+   */
+  prefixPattern: RegExp;
 }
 
 export interface GenerateFailure {
@@ -90,6 +110,12 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
 
   const migrationsDir = resolve(cwd, options.migrations);
   const outPath = resolve(cwd, options.out ?? DEFAULT_OUT);
+
+  // Before anything expensive: a misordered set builds the wrong schema silently.
+  const orderCheck = options.checkMigrationOrder ?? config.checkMigrationOrder;
+  if (orderCheck) {
+    requireOrderedMigrations({ migrationsDir, prefixPattern: orderCheck.prefixPattern });
+  }
 
   // Resolve the query globs; skip our own generated output.
   const globs = Array.isArray(options.queries) ? options.queries : [options.queries];

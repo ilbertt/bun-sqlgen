@@ -143,6 +143,22 @@ non-zero on a problem:
 - **`--check-stale`** — fail if the committed `queries.gen.ts` is out of date.
 - **`--check`** — run both; the one-flag CI default.
 
+A fourth check guards the migrations rather than the output, so it runs on a plain
+generate too and isn't folded into `--check`. Migrations apply in filename order, which
+is the order you meant only while every prefix is the same width — `1, 2, 10` applies
+as `1, 10, 2`. Naming the prefix turns the check on:
+
+```ts
+// sqlgen.config.ts
+export default defineConfig({
+  checkMigrationOrder: { prefixPattern: /^\d+/ }, // or --check-migration-order '^\d+'
+});
+```
+
+It fails on a migration with no prefix, on two sharing one, and on prefixes of differing
+widths; gaps are fine. Width is the whole rule, so an unnumbered scheme works on its own
+terms: `/^[a-z]{4}_/`, `/^\d{14}_/`.
+
 Commit the generated file and run `--check` in CI so an edited query can never
 type-check against a stale shape. The
 [`check-only` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/check-only)
