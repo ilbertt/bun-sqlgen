@@ -163,13 +163,17 @@ instead of the default and it's held to its own terms:
 ```ts
 // sqlgen.config.ts
 export default defineConfig({
-  checkMigrationOrder: /^[a-z]{4}_/, // aaaa_init.sql, aaab_add_users.sql, …
+  checkMigrationOrder: {
+    enabled: true,
+    prefixPattern: /^[a-z]{4}_/, // aaaa_init.sql, aaab_add_users.sql, …
+  },
 });
 ```
 
-`true` uses the default numeric prefix (`/^\d+/`), which is what the CLI flag turns on;
-`/^\d{14}_/` covers a timestamp convention. The config field applies on a plain
-generate too, so the check holds whether or not CI passed the flag.
+`prefixPattern` defaults to a leading run of digits (`/^\d+/`); `/^\d{14}_/` covers a
+timestamp convention. The config applies on a plain generate too, so the check holds
+whether or not CI passed the flag — and passing the flag only sets `enabled`, so a
+`prefixPattern` configured here still governs.
 
 Commit the generated file and run `--check` in CI so an edited query can never
 type-check against a stale shape. The
@@ -242,9 +246,9 @@ export default defineConfig({
   // CONCURRENTLY can't run inside the transaction a multi-statement file applies in).
   transformMigration: ({ sql }) => sql.replace(/\bCONCURRENTLY\b/g, ''),
   // require every migration to be numbered 0001, 0002, … so filename order
-  // (the order they apply in) is the order they were meant to run in. A RegExp
-  // here replaces the numeric default with your own prefix scheme.
-  checkMigrationOrder: true,
+  // (the order they apply in) is the order they were meant to run in.
+  // `prefixPattern` swaps the numeric default for your own scheme.
+  checkMigrationOrder: { enabled: true },
 });
 ```
 

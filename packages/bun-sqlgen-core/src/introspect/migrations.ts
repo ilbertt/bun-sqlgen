@@ -32,8 +32,8 @@ export async function applyMigrations(input: {
   }
 }
 
-/** Identifies the sequence prefix when the check is turned on with a plain `true`. */
-const DEFAULT_SEQUENCE_PREFIX = /^\d+/;
+/** Identifies the sequence prefix when the check names no pattern of its own. */
+const DEFAULT_PREFIX_PATTERN = /^\d+/;
 
 /**
  * Migrations apply in filename order, so that is the order you meant only while every
@@ -44,9 +44,9 @@ const DEFAULT_SEQUENCE_PREFIX = /^\d+/;
  */
 export function requireOrderedMigrations(input: {
   migrationsDir: string;
-  pattern: true | RegExp;
+  prefixPattern?: RegExp;
 }): void {
-  const configured = input.pattern === true ? DEFAULT_SEQUENCE_PREFIX : input.pattern;
+  const configured = input.prefixPattern ?? DEFAULT_PREFIX_PATTERN;
   // `exec` carries `lastIndex` between calls under `g`/`y`; each filename is its own test.
   const pattern = new RegExp(configured.source, configured.flags.replace(/[gy]/g, ''));
 

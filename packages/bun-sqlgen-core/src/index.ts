@@ -4,6 +4,7 @@ export type {
   GenerateFailure,
   GenerateOptions,
   GenerateResult,
+  MigrationOrderCheck,
 } from '#generate.ts';
 export { generate } from '#generate.ts';
 export { oidToTs, PG_OID } from '#oids.ts';

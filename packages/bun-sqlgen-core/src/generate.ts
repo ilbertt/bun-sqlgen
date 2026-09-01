@@ -42,11 +42,12 @@ export interface GenerateOptions {
   /**
    * Fail unless every migration filename carries a unique sequence prefix, all of one
    * width — what makes filename order (the order they apply in) the intended one.
-   * `true` expects a numeric prefix; a `RegExp` says where the prefix ends instead.
-   * Overrides config; defaults to `false`. Unlike the other checks it guards generation
-   * itself, so it runs in every mode rather than replacing the write.
+   * Merged over config rather than replacing it, so turning the check on from the CLI
+   * keeps the `prefixPattern` the config set. Off unless enabled. Unlike the other
+   * checks it guards generation itself, so it runs in every mode rather than
+   * replacing the write.
    */
-  checkMigrationOrder?: boolean | RegExp;
+  checkMigrationOrder?: MigrationOrderCheck;
   /** Explicit path to `sqlgen.config.{ts,js,mjs}`; auto-discovered otherwise. */
   configPath?: string;
   /** Output path for the aggregated module, relative to `cwd`. Defaults to `src/queries.gen.ts`. */
@@ -62,6 +63,17 @@ export interface GenerateOptions {
    * constraint names. Overrides config; defaults to `true`.
    */
   schema?: boolean;
+}
+
+/** Settings for the migration-order check. */
+export interface MigrationOrderCheck {
+  enabled: boolean;
+  /**
+   * What identifies a filename's sequence prefix — the part that has to be unique and
+   * equally wide across every migration. Defaults to a leading run of digits (`/^\d+/`);
+   * `/^\d{14}_/` covers a timestamp scheme, `/^[a-z]{4}_/` a lettered one.
+   */
+  prefixPattern?: RegExp;
 }
 
 export interface GenerateFailure {
@@ -100,10 +112,12 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   const migrationsDir = resolve(cwd, options.migrations);
   const outPath = resolve(cwd, options.out ?? DEFAULT_OUT);
 
-  // Before anything expensive: a misordered set builds the wrong schema silently.
-  const checkOrder = options.checkMigrationOrder ?? config.checkMigrationOrder ?? false;
-  if (checkOrder) {
-    requireOrderedMigrations({ migrationsDir, pattern: checkOrder });
+  // Before anything expensive: a misordered set builds the wrong schema silently. The
+  // merge lets `--check-migration-order` enable the check without discarding the
+  // pattern the config chose for it.
+  const orderCheck = { ...config.checkMigrationOrder, ...options.checkMigrationOrder };
+  if (orderCheck.enabled) {
+    requireOrderedMigrations({ migrationsDir, prefixPattern: orderCheck.prefixPattern });
   }
 
   // Resolve the query globs; skip our own generated output.

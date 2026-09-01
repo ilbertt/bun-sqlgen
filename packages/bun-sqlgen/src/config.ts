@@ -3,6 +3,17 @@ import type { Extensions } from '@electric-sql/pglite';
 /** Which engine introspects the migrations at build time. Defaults to `postgres`. */
 export type Dialect = 'postgres' | 'sqlite';
 
+/** Settings for the migration-order check. */
+export interface MigrationOrderCheck {
+  enabled: boolean;
+  /**
+   * What identifies a filename's sequence prefix — the part that has to be unique and
+   * equally wide across every migration. Defaults to a leading run of digits (`/^\d+/`);
+   * `/^\d{14}_/` covers a timestamp scheme, `/^[a-z]{4}_/` a lettered one.
+   */
+  prefixPattern?: RegExp;
+}
+
 interface BaseConfig {
   /** Database engine the queries run against. Defaults to `postgres`. */
   dialect?: Dialect;
@@ -14,11 +25,10 @@ interface BaseConfig {
   /**
    * Fail unless every migration filename carries a unique sequence prefix, all of one
    * width — migrations apply in filename order, so `1, 2, 10` applies as `1, 10, 2`.
-   * `true` expects a numeric prefix; pass a `RegExp` for any other scheme
-   * (`/^\d{14}_/` for timestamps, `/^[a-z]{4}_/` for letters). Defaults to `false`;
-   * `--check-migration-order` turns on the numeric default from the CLI.
+   * Off unless enabled; `--check-migration-order` enables it from the CLI without
+   * discarding the `prefixPattern` set here.
    */
-  checkMigrationOrder?: boolean | RegExp;
+  checkMigrationOrder?: MigrationOrderCheck;
   /** SQL run before migrations (stub functions/types/extensions). */
   prelude?: string;
   /** Rewrite or strip statements the throwaway DB can't run, per migration file. */
