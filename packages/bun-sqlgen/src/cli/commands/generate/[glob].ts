@@ -3,6 +3,15 @@ import { generate } from '@repo/bun-sqlgen-core';
 import { z } from 'zod';
 import { GenerationFailed } from '#cli/errors.ts';
 
+// The flag carries the pattern itself, so a bad one is a CLI mistake worth naming.
+function toPrefixPattern(source: string): RegExp {
+  try {
+    return new RegExp(source);
+  } catch {
+    throw new Error(`--check-migration-order is not a valid regular expression: ${source}`);
+  }
+}
+
 export const command = defineCommand('generate [glob]', {
   description:
     'Generate result types for the Bun.sql queries matching <glob> (e.g. "src/**/*.ts").',
@@ -36,9 +45,9 @@ export const command = defineCommand('generate [glob]', {
       description: 'Fail if the committed generated types are out of date. Writes nothing.',
     },
     'check-migration-order': {
-      schema: z.boolean().optional(),
+      schema: z.string().optional(),
       description:
-        'Enable the migration-order check: fail unless every migration filename carries a unique, equally wide sequence prefix. Reads its prefixPattern from checkMigrationOrder in sqlgen.config.ts, which is required. Not part of --check.',
+        'Fail unless every migration filename carries a unique sequence prefix matching <pattern>, all of one width (e.g. "^\\d+" for 0001_init.sql). Overrides config; not part of --check.',
     },
     dialect: {
       schema: z.enum(['postgres', 'sqlite']).optional(),
@@ -65,9 +74,10 @@ export const command = defineCommand('generate [glob]', {
       packageName: options.package,
       configPath: options.config,
       dialect: options.dialect,
-      // Absent, the config decides; the flag only ever turns the check on, and core
-      // merges it over the config, which is where the `prefixPattern` comes from.
-      checkMigrationOrder: options['check-migration-order'] ? { enabled: true } : undefined,
+      // Absent, the config decides — including whether the check runs at all.
+      checkMigrationOrder: options['check-migration-order']
+        ? { prefixPattern: toPrefixPattern(options['check-migration-order']) }
+        : undefined,
       // Absent, the config decides; the flag only ever turns the schema block off.
       schema: options['no-schema'] ? false : undefined,
       checkQueries,

@@ -146,18 +146,24 @@ non-zero on a problem:
 ### Migration order
 
 A fourth check guards the migrations themselves rather than the output, so it runs on a
-plain generate too and is *not* folded into `--check`. It's configured, not flagged on,
-because it needs to know your naming convention:
+plain generate too and is *not* folded into `--check`. It needs to know your naming
+convention, so you give it one — either in the config, or as the flag's value:
 
 ```ts
 // sqlgen.config.ts
 export default defineConfig({
   checkMigrationOrder: {
-    enabled: true,
     prefixPattern: /^\d+/, // 0001_init.sql, 0002_add_users.sql, …
   },
 });
 ```
+
+```sh
+bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations --check-migration-order '^\d+'
+```
+
+Naming a pattern is what turns the check on; there is no default, because only you know
+which convention your filenames were named for. The flag overrides the config.
 
 Migrations apply in filename order, which is the order you meant only while every
 filename carries a sequence prefix of the same width — `1, 2, 10` applies as
@@ -168,18 +174,6 @@ are fine.
 Width, not "is it a number", is what's checked: equal-width prefixes sort the same way
 in any positional scheme, so a scheme that doesn't number at all is held to its own
 terms — `/^[a-z]{4}_/` for `aaaa_init.sql`, `/^\d{14}_/` for a timestamp convention.
-`prefixPattern` is required and has no default: only you know which convention your
-filenames were named for.
-
-`--check-migration-order` sets `enabled` from the CLI, for a project that wants the
-check in CI but not on every local generate:
-
-```sh
-bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations --check-migration-order
-```
-
-The flag contributes only `enabled` and is merged over the config, so `prefixPattern`
-still has to be configured — the flag alone can't guess one.
 
 Commit the generated file and run `--check` in CI so an edited query can never
 type-check against a stale shape. The
@@ -253,7 +247,7 @@ export default defineConfig({
   transformMigration: ({ sql }) => sql.replace(/\bCONCURRENTLY\b/g, ''),
   // require every migration to be numbered 0001, 0002, … so filename order
   // (the order they apply in) is the order they were meant to run in.
-  checkMigrationOrder: { enabled: true, prefixPattern: /^\d+/ },
+  checkMigrationOrder: { prefixPattern: /^\d+/ },
 });
 ```
 
