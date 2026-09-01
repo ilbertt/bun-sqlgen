@@ -32,55 +32,61 @@ export async function applyMigrations(input: {
   }
 }
 
-const SEQUENCE_PREFIX = /^\d+/;
+/** Identifies the sequence prefix when the check is turned on with a plain `true`. */
+const DEFAULT_SEQUENCE_PREFIX = /^\d+/;
 
 /**
- * Migrations apply in filename order, which agrees with the order their numbers imply
- * only while every prefix is padded to the same width: `1, 2, 10` applies as
- * `1, 10, 2`, building a different schema than production without failing. Opt-in via
- * `checkMigrationOrder`, since an unnumbered scheme is a valid choice on its own.
+ * Migrations apply in filename order, so that is the order you meant only while every
+ * filename carries a sequence prefix, all of them the same width and none repeated:
+ * `1, 2, 10` applies as `1, 10, 2`. Width, not "is it a number", is the invariant —
+ * equal-width prefixes sort the same way in any positional scheme, so a letter or
+ * timestamp convention passes on its own terms. `pattern` says where the prefix ends.
  */
-export function requireOrderedMigrations(migrationsDir: string): void {
-  const problems: string[] = [];
-  const numbered: Array<{ filename: string; sequence: number }> = [];
+export function requireOrderedMigrations(input: {
+  migrationsDir: string;
+  pattern: true | RegExp;
+}): void {
+  const configured = input.pattern === true ? DEFAULT_SEQUENCE_PREFIX : input.pattern;
+  // `exec` carries `lastIndex` between calls under `g`/`y`; each filename is its own test.
+  const pattern = new RegExp(configured.source, configured.flags.replace(/[gy]/g, ''));
 
-  for (const filename of listMigrations(migrationsDir)) {
-    const prefix = SEQUENCE_PREFIX.exec(filename)?.[0];
-    if (prefix === undefined) {
-      problems.push(`${filename} — no leading sequence number`);
+  const problems: string[] = [];
+  const prefixes: Array<{ filename: string; prefix: string }> = [];
+
+  for (const filename of listMigrations(input.migrationsDir)) {
+    const match = pattern.exec(filename);
+    // A match anywhere but the start orders nothing.
+    const prefix = match?.index === 0 ? match[0] : null;
+    if (prefix === null) {
+      problems.push(`${filename} — no ${pattern} prefix`);
       continue;
     }
-    numbered.push({ filename, sequence: Number(prefix) });
+    prefixes.push({ filename, prefix });
   }
 
-  // Two migrations claiming the same number — the usual merge accident — leave the
-  // order between them to the rest of the filename.
-  const bySequence = new Map<number, string>();
-  for (const { filename, sequence } of numbered) {
-    const claimed = bySequence.get(sequence);
+  // Two migrations claiming one prefix — the usual merge accident — leave the order
+  // between them to whatever the rest of the filename happens to be.
+  const claimedBy = new Map<string, string>();
+  for (const { filename, prefix } of prefixes) {
+    const claimed = claimedBy.get(prefix);
     if (claimed === undefined) {
-      bySequence.set(sequence, filename);
+      claimedBy.set(prefix, filename);
     } else {
-      problems.push(`${filename} — same sequence number as ${claimed}`);
+      problems.push(`${filename} — same "${prefix}" prefix as ${claimed}`);
     }
   }
 
-  // The list is already in applied order, so "ascending across every adjacent pair"
-  // is exactly "filename order == numeric order".
-  let previous: { filename: string; sequence: number } | null = null;
-  for (const entry of numbered) {
-    if (previous && previous.sequence > entry.sequence) {
-      problems.push(
-        `${previous.filename} — applies before ${entry.filename}, but ${previous.sequence} > ${entry.sequence}`,
-      );
+  const widest = Math.max(0, ...prefixes.map((p) => p.prefix.length));
+  for (const { filename, prefix } of prefixes) {
+    if (prefix.length < widest) {
+      problems.push(`${filename} — "${prefix}" is ${prefix.length} wide, the widest is ${widest}`);
     }
-    previous = entry;
   }
 
   if (problems.length) {
     throw new Error(
-      `migrations are not in sequence order:\n${problems.map((p) => `  ✗ ${p}`).join('\n')}\n` +
-        '  Migrations apply in filename order — zero-pad the prefixes (0001, 0002, … 0010) so it matches.',
+      `migrations are not in a dependable order:\n${problems.map((p) => `  ✗ ${p}`).join('\n')}\n` +
+        `  They apply in filename order — give each a unique ${pattern} prefix, padded to one width.`,
     );
   }
 }

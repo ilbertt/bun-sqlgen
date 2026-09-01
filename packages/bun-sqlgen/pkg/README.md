@@ -150,12 +150,26 @@ than the output, so it runs on a plain generate too and is *not* folded into `--
 bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations --check-migration-order
 ```
 
-Migrations apply in filename order, which only matches the order their numbers imply
-while every prefix is padded to the same width — `1, 2, 10` applies as `1, 10, 2`,
-building a schema production never had. The flag fails on a migration with no leading
-sequence number, on two migrations claiming the same number, and on any pair whose
-filename order disagrees with their numbers. Turn it on for the whole project with
-`checkMigrationOrder: true` in `sqlgen.config.ts`.
+Migrations apply in filename order, which is the order you meant only while every
+filename carries a sequence prefix of the same width — `1, 2, 10` applies as
+`1, 10, 2`, building a schema production never had. The flag fails on a migration with
+no prefix, on two claiming the same prefix, and on prefixes of differing widths. Gaps
+are fine.
+
+Width, not "is it a number", is what's checked: equal-width prefixes sort the same way
+in any positional scheme. So if you don't number your migrations, name the scheme
+instead of the default and it's held to its own terms:
+
+```ts
+// sqlgen.config.ts
+export default defineConfig({
+  checkMigrationOrder: /^[a-z]{4}_/, // aaaa_init.sql, aaab_add_users.sql, …
+});
+```
+
+`true` uses the default numeric prefix (`/^\d+/`), which is what the CLI flag turns on;
+`/^\d{14}_/` covers a timestamp convention. The config field applies on a plain
+generate too, so the check holds whether or not CI passed the flag.
 
 Commit the generated file and run `--check` in CI so an edited query can never
 type-check against a stale shape. The
@@ -228,7 +242,8 @@ export default defineConfig({
   // CONCURRENTLY can't run inside the transaction a multi-statement file applies in).
   transformMigration: ({ sql }) => sql.replace(/\bCONCURRENTLY\b/g, ''),
   // require every migration to be numbered 0001, 0002, … so filename order
-  // (the order they apply in) matches the order the numbers imply.
+  // (the order they apply in) is the order they were meant to run in. A RegExp
+  // here replaces the numeric default with your own prefix scheme.
   checkMigrationOrder: true,
 });
 ```

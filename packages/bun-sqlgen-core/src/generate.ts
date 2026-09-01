@@ -40,11 +40,13 @@ export interface GenerateOptions {
   /** Fail if the committed generated module is out of date. Read-only (no write). */
   checkStale?: boolean;
   /**
-   * Fail unless every migration filename carries a unique, consistently zero-padded
-   * sequence number. Overrides config; defaults to `false`. Unlike the other checks it
-   * guards generation itself, so it runs in every mode rather than replacing the write.
+   * Fail unless every migration filename carries a unique sequence prefix, all of one
+   * width — what makes filename order (the order they apply in) the intended one.
+   * `true` expects a numeric prefix; a `RegExp` says where the prefix ends instead.
+   * Overrides config; defaults to `false`. Unlike the other checks it guards generation
+   * itself, so it runs in every mode rather than replacing the write.
    */
-  checkMigrationOrder?: boolean;
+  checkMigrationOrder?: boolean | RegExp;
   /** Explicit path to `sqlgen.config.{ts,js,mjs}`; auto-discovered otherwise. */
   configPath?: string;
   /** Output path for the aggregated module, relative to `cwd`. Defaults to `src/queries.gen.ts`. */
@@ -99,8 +101,9 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   const outPath = resolve(cwd, options.out ?? DEFAULT_OUT);
 
   // Before anything expensive: a misordered set builds the wrong schema silently.
-  if (options.checkMigrationOrder ?? config.checkMigrationOrder ?? false) {
-    requireOrderedMigrations(migrationsDir);
+  const checkOrder = options.checkMigrationOrder ?? config.checkMigrationOrder ?? false;
+  if (checkOrder) {
+    requireOrderedMigrations({ migrationsDir, pattern: checkOrder });
   }
 
   // Resolve the query globs; skip our own generated output.

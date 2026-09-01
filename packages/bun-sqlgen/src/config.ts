@@ -12,11 +12,13 @@ interface BaseConfig {
    */
   schema?: boolean;
   /**
-   * Fail unless every migration filename carries a unique, consistently zero-padded
-   * sequence number — migrations apply in filename order, so `1, 2, 10` applies as
-   * `1, 10, 2`. Defaults to `false`; `--check-migration-order` turns it on from the CLI.
+   * Fail unless every migration filename carries a unique sequence prefix, all of one
+   * width — migrations apply in filename order, so `1, 2, 10` applies as `1, 10, 2`.
+   * `true` expects a numeric prefix; pass a `RegExp` for any other scheme
+   * (`/^\d{14}_/` for timestamps, `/^[a-z]{4}_/` for letters). Defaults to `false`;
+   * `--check-migration-order` turns on the numeric default from the CLI.
    */
-  checkMigrationOrder?: boolean;
+  checkMigrationOrder?: boolean | RegExp;
   /** SQL run before migrations (stub functions/types/extensions). */
   prelude?: string;
   /** Rewrite or strip statements the throwaway DB can't run, per migration file. */

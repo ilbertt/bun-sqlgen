@@ -38,7 +38,7 @@ export const command = defineCommand('generate [glob]', {
     'check-migration-order': {
       schema: z.boolean().optional(),
       description:
-        'Fail unless every migration filename carries a unique, consistently zero-padded sequence number (0001, 0002, … 0010). Not part of --check.',
+        'Fail unless every migration filename carries a unique, equally wide sequence number (0001, 0002, … 0010). Set checkMigrationOrder in the config for a non-numeric scheme. Not part of --check.',
     },
     dialect: {
       schema: z.enum(['postgres', 'sqlite']).optional(),
