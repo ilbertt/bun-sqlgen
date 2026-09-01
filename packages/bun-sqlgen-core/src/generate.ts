@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { createDiscoverer } from '#discover.ts';
 import { emitModule, GENERATED_MARKER } from '#emit/index.ts';
 import { createIntrospector } from '#introspect/index.ts';
+import { requireOrderedMigrations } from '#introspect/migrations.ts';
 import {
   parseColumnComments,
   parseOverrides,
@@ -19,7 +20,7 @@ import type {
 } from '#types.ts';
 
 type LoadedConfig = Partial<Omit<IntrospectorOptions, 'migrationsDir'>> &
-  Pick<GenerateOptions, 'schema'>;
+  Pick<GenerateOptions, 'schema' | 'checkMigrationOrder'>;
 
 // Where the aggregated module lands when `--out` is omitted. A `.ts`, not a `.d.ts`:
 // the module is a normal source file, so it can carry values as well as types.
@@ -38,6 +39,12 @@ export interface GenerateOptions {
   checkQueries?: boolean;
   /** Fail if the committed generated module is out of date. Read-only (no write). */
   checkStale?: boolean;
+  /**
+   * Fail unless every migration filename carries a unique, consistently zero-padded
+   * sequence number. Overrides config; defaults to `false`. Unlike the other checks it
+   * guards generation itself, so it runs in every mode rather than replacing the write.
+   */
+  checkMigrationOrder?: boolean;
   /** Explicit path to `sqlgen.config.{ts,js,mjs}`; auto-discovered otherwise. */
   configPath?: string;
   /** Output path for the aggregated module, relative to `cwd`. Defaults to `src/queries.gen.ts`. */
@@ -90,6 +97,11 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
 
   const migrationsDir = resolve(cwd, options.migrations);
   const outPath = resolve(cwd, options.out ?? DEFAULT_OUT);
+
+  // Before anything expensive: a misordered set builds the wrong schema silently.
+  if (options.checkMigrationOrder ?? config.checkMigrationOrder ?? false) {
+    requireOrderedMigrations(migrationsDir);
+  }
 
   // Resolve the query globs; skip our own generated output.
   const globs = Array.isArray(options.queries) ? options.queries : [options.queries];

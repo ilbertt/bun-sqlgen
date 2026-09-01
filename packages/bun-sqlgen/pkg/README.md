@@ -143,6 +143,20 @@ non-zero on a problem:
 - **`--check-stale`** — fail if the committed `queries.gen.ts` is out of date.
 - **`--check`** — run both; the one-flag CI default.
 
+A fourth flag, **`--check-migration-order`**, guards the migrations themselves rather
+than the output, so it runs on a plain generate too and is *not* folded into `--check`:
+
+```sh
+bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations --check-migration-order
+```
+
+Migrations apply in filename order, which only matches the order their numbers imply
+while every prefix is padded to the same width — `1, 2, 10` applies as `1, 10, 2`,
+building a schema production never had. The flag fails on a migration with no leading
+sequence number, on two migrations claiming the same number, and on any pair whose
+filename order disagrees with their numbers. Turn it on for the whole project with
+`checkMigrationOrder: true` in `sqlgen.config.ts`.
+
 Commit the generated file and run `--check` in CI so an edited query can never
 type-check against a stale shape. The
 [`check-only` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/check-only)
@@ -213,13 +227,16 @@ export default defineConfig({
   // rewrite/strip statements PGlite can't run, per migration file (CREATE INDEX
   // CONCURRENTLY can't run inside the transaction a multi-statement file applies in).
   transformMigration: ({ sql }) => sql.replace(/\bCONCURRENTLY\b/g, ''),
+  // require every migration to be numbered 0001, 0002, … so filename order
+  // (the order they apply in) matches the order the numbers imply.
+  checkMigrationOrder: true,
 });
 ```
 
 `defineConfig` is optional — a plain `export default { … }` still works, but you
 lose the type-checking and autocompletion.
 
-A runnable walkthrough of all three fields lives in the
+A runnable walkthrough of the three schema-shaping fields lives in the
 [`with-config` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/with-config).
 `extensions` is Postgres-only; `prelude` and `transformMigration` apply to both
 dialects, and `dialect: 'sqlite'` selects SQLite (the `--dialect` flag overrides it).

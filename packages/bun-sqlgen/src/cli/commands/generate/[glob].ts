@@ -35,6 +35,11 @@ export const command = defineCommand('generate [glob]', {
       schema: z.boolean().optional(),
       description: 'Fail if the committed generated types are out of date. Writes nothing.',
     },
+    'check-migration-order': {
+      schema: z.boolean().optional(),
+      description:
+        'Fail unless every migration filename carries a unique, consistently zero-padded sequence number (0001, 0002, … 0010). Not part of --check.',
+    },
     dialect: {
       schema: z.enum(['postgres', 'sqlite']).optional(),
       description: 'Database engine to introspect against (default postgres; overrides config).',
@@ -60,6 +65,8 @@ export const command = defineCommand('generate [glob]', {
       packageName: options.package,
       configPath: options.config,
       dialect: options.dialect,
+      // Absent, the config decides; the flag only ever turns the check on.
+      checkMigrationOrder: options['check-migration-order'] || undefined,
       // Absent, the config decides; the flag only ever turns the schema block off.
       schema: options['no-schema'] ? false : undefined,
       checkQueries,

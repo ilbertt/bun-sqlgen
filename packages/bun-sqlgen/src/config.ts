@@ -11,6 +11,12 @@ interface BaseConfig {
    * constraint names. Defaults to `true`; `--no-schema` turns it off from the CLI.
    */
   schema?: boolean;
+  /**
+   * Fail unless every migration filename carries a unique, consistently zero-padded
+   * sequence number — migrations apply in filename order, so `1, 2, 10` applies as
+   * `1, 10, 2`. Defaults to `false`; `--check-migration-order` turns it on from the CLI.
+   */
+  checkMigrationOrder?: boolean;
   /** SQL run before migrations (stub functions/types/extensions). */
   prelude?: string;
   /** Rewrite or strip statements the throwaway DB can't run, per migration file. */
