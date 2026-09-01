@@ -42,12 +42,12 @@ export interface GenerateOptions {
   /**
    * Fail unless every migration filename carries a unique sequence prefix, all of one
    * width — what makes filename order (the order they apply in) the intended one.
-   * Merged over config rather than replacing it, so turning the check on from the CLI
-   * keeps the `prefixPattern` the config set. Off unless enabled. Unlike the other
-   * checks it guards generation itself, so it runs in every mode rather than
-   * replacing the write.
+   * Partial because `--check-migration-order` contributes only `enabled`: this is
+   * merged over the config's settings, and the result still needs a `prefixPattern`.
+   * Off unless enabled. Unlike the other checks it guards generation itself, so it
+   * runs in every mode rather than replacing the write.
    */
-  checkMigrationOrder?: MigrationOrderCheck;
+  checkMigrationOrder?: Partial<MigrationOrderCheck>;
   /** Explicit path to `sqlgen.config.{ts,js,mjs}`; auto-discovered otherwise. */
   configPath?: string;
   /** Output path for the aggregated module, relative to `cwd`. Defaults to `src/queries.gen.ts`. */
@@ -70,10 +70,11 @@ export interface MigrationOrderCheck {
   enabled: boolean;
   /**
    * What identifies a filename's sequence prefix — the part that has to be unique and
-   * equally wide across every migration. Defaults to a leading run of digits (`/^\d+/`);
-   * `/^\d{14}_/` covers a timestamp scheme, `/^[a-z]{4}_/` a lettered one.
+   * equally wide across every migration. Required, and deliberately not defaulted: only
+   * you know which convention your migrations were named for. `/^\d+/` matches
+   * `0001_init.sql`, `/^\d{14}_/` a timestamp scheme, `/^[a-z]{4}_/` a lettered one.
    */
-  prefixPattern?: RegExp;
+  prefixPattern: RegExp;
 }
 
 export interface GenerateFailure {
@@ -117,6 +118,13 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   // pattern the config chose for it.
   const orderCheck = { ...config.checkMigrationOrder, ...options.checkMigrationOrder };
   if (orderCheck.enabled) {
+    // The config is imported at runtime, so its own type can't be the guarantee here.
+    if (!orderCheck.prefixPattern) {
+      throw new Error(
+        'checkMigrationOrder is enabled but names no prefixPattern — set one in ' +
+          'sqlgen.config.ts (`prefixPattern: /^\\d+/` for 0001_init.sql).',
+      );
+    }
     requireOrderedMigrations({ migrationsDir, prefixPattern: orderCheck.prefixPattern });
   }
 

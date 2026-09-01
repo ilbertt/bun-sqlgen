@@ -8,10 +8,11 @@ export interface MigrationOrderCheck {
   enabled: boolean;
   /**
    * What identifies a filename's sequence prefix — the part that has to be unique and
-   * equally wide across every migration. Defaults to a leading run of digits (`/^\d+/`);
-   * `/^\d{14}_/` covers a timestamp scheme, `/^[a-z]{4}_/` a lettered one.
+   * equally wide across every migration. Required, and deliberately not defaulted: only
+   * you know which convention your migrations were named for. `/^\d+/` matches
+   * `0001_init.sql`, `/^\d{14}_/` a timestamp scheme, `/^[a-z]{4}_/` a lettered one.
    */
-  prefixPattern?: RegExp;
+  prefixPattern: RegExp;
 }
 
 interface BaseConfig {
@@ -25,8 +26,8 @@ interface BaseConfig {
   /**
    * Fail unless every migration filename carries a unique sequence prefix, all of one
    * width — migrations apply in filename order, so `1, 2, 10` applies as `1, 10, 2`.
-   * Off unless enabled; `--check-migration-order` enables it from the CLI without
-   * discarding the `prefixPattern` set here.
+   * Off unless enabled; `--check-migration-order` enables it from the CLI, and needs
+   * the `prefixPattern` to come from here.
    */
   checkMigrationOrder?: MigrationOrderCheck;
   /** SQL run before migrations (stub functions/types/extensions). */

@@ -32,23 +32,21 @@ export async function applyMigrations(input: {
   }
 }
 
-/** Identifies the sequence prefix when the check names no pattern of its own. */
-const DEFAULT_PREFIX_PATTERN = /^\d+/;
-
 /**
  * Migrations apply in filename order, so that is the order you meant only while every
  * filename carries a sequence prefix, all of them the same width and none repeated:
  * `1, 2, 10` applies as `1, 10, 2`. Width, not "is it a number", is the invariant —
  * equal-width prefixes sort the same way in any positional scheme, so a letter or
- * timestamp convention passes on its own terms. `pattern` says where the prefix ends.
+ * timestamp convention passes on its own terms. `prefixPattern` says where the prefix
+ * ends; there is no default, since only the caller knows the convention it meant.
  */
 export function requireOrderedMigrations(input: {
   migrationsDir: string;
-  prefixPattern?: RegExp;
+  prefixPattern: RegExp;
 }): void {
-  const configured = input.prefixPattern ?? DEFAULT_PREFIX_PATTERN;
   // `exec` carries `lastIndex` between calls under `g`/`y`; each filename is its own test.
-  const pattern = new RegExp(configured.source, configured.flags.replace(/[gy]/g, ''));
+  const { prefixPattern } = input;
+  const pattern = new RegExp(prefixPattern.source, prefixPattern.flags.replace(/[gy]/g, ''));
 
   const problems: string[] = [];
   const prefixes: Array<{ filename: string; prefix: string }> = [];

@@ -38,7 +38,7 @@ export const command = defineCommand('generate [glob]', {
     'check-migration-order': {
       schema: z.boolean().optional(),
       description:
-        'Fail unless every migration filename carries a unique, equally wide sequence prefix (0001, 0002, … 0010). Set checkMigrationOrder.prefixPattern in the config for a non-numeric scheme. Not part of --check.',
+        'Enable the migration-order check: fail unless every migration filename carries a unique, equally wide sequence prefix. Reads its prefixPattern from checkMigrationOrder in sqlgen.config.ts, which is required. Not part of --check.',
     },
     dialect: {
       schema: z.enum(['postgres', 'sqlite']).optional(),
@@ -66,7 +66,7 @@ export const command = defineCommand('generate [glob]', {
       configPath: options.config,
       dialect: options.dialect,
       // Absent, the config decides; the flag only ever turns the check on, and core
-      // merges it over the config so a configured `prefixPattern` survives.
+      // merges it over the config, which is where the `prefixPattern` comes from.
       checkMigrationOrder: options['check-migration-order'] ? { enabled: true } : undefined,
       // Absent, the config decides; the flag only ever turns the schema block off.
       schema: options['no-schema'] ? false : undefined,

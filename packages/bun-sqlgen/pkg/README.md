@@ -143,37 +143,43 @@ non-zero on a problem:
 - **`--check-stale`** — fail if the committed `queries.gen.ts` is out of date.
 - **`--check`** — run both; the one-flag CI default.
 
-A fourth flag, **`--check-migration-order`**, guards the migrations themselves rather
-than the output, so it runs on a plain generate too and is *not* folded into `--check`:
+### Migration order
 
-```sh
-bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations --check-migration-order
-```
-
-Migrations apply in filename order, which is the order you meant only while every
-filename carries a sequence prefix of the same width — `1, 2, 10` applies as
-`1, 10, 2`, building a schema production never had. The flag fails on a migration with
-no prefix, on two claiming the same prefix, and on prefixes of differing widths. Gaps
-are fine.
-
-Width, not "is it a number", is what's checked: equal-width prefixes sort the same way
-in any positional scheme. So if you don't number your migrations, name the scheme
-instead of the default and it's held to its own terms:
+A fourth check guards the migrations themselves rather than the output, so it runs on a
+plain generate too and is *not* folded into `--check`. It's configured, not flagged on,
+because it needs to know your naming convention:
 
 ```ts
 // sqlgen.config.ts
 export default defineConfig({
   checkMigrationOrder: {
     enabled: true,
-    prefixPattern: /^[a-z]{4}_/, // aaaa_init.sql, aaab_add_users.sql, …
+    prefixPattern: /^\d+/, // 0001_init.sql, 0002_add_users.sql, …
   },
 });
 ```
 
-`prefixPattern` defaults to a leading run of digits (`/^\d+/`); `/^\d{14}_/` covers a
-timestamp convention. The config applies on a plain generate too, so the check holds
-whether or not CI passed the flag — and passing the flag only sets `enabled`, so a
-`prefixPattern` configured here still governs.
+Migrations apply in filename order, which is the order you meant only while every
+filename carries a sequence prefix of the same width — `1, 2, 10` applies as
+`1, 10, 2`, building a schema production never had. The check fails on a migration with
+no prefix, on two claiming the same prefix, and on prefixes of differing widths. Gaps
+are fine.
+
+Width, not "is it a number", is what's checked: equal-width prefixes sort the same way
+in any positional scheme, so a scheme that doesn't number at all is held to its own
+terms — `/^[a-z]{4}_/` for `aaaa_init.sql`, `/^\d{14}_/` for a timestamp convention.
+`prefixPattern` is required and has no default: only you know which convention your
+filenames were named for.
+
+`--check-migration-order` sets `enabled` from the CLI, for a project that wants the
+check in CI but not on every local generate:
+
+```sh
+bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations --check-migration-order
+```
+
+The flag contributes only `enabled` and is merged over the config, so `prefixPattern`
+still has to be configured — the flag alone can't guess one.
 
 Commit the generated file and run `--check` in CI so an edited query can never
 type-check against a stale shape. The
@@ -247,8 +253,7 @@ export default defineConfig({
   transformMigration: ({ sql }) => sql.replace(/\bCONCURRENTLY\b/g, ''),
   // require every migration to be numbered 0001, 0002, … so filename order
   // (the order they apply in) is the order they were meant to run in.
-  // `prefixPattern` swaps the numeric default for your own scheme.
-  checkMigrationOrder: { enabled: true },
+  checkMigrationOrder: { enabled: true, prefixPattern: /^\d+/ },
 });
 ```
 
