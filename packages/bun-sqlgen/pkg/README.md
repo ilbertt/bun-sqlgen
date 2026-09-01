@@ -143,37 +143,21 @@ non-zero on a problem:
 - **`--check-stale`** — fail if the committed `queries.gen.ts` is out of date.
 - **`--check`** — run both; the one-flag CI default.
 
-### Migration order
-
-A fourth check guards the migrations themselves rather than the output, so it runs on a
-plain generate too and is *not* folded into `--check`. It needs to know your naming
-convention, so you give it one — either in the config, or as the flag's value:
+A fourth check guards the migrations rather than the output, so it runs on a plain
+generate too and isn't folded into `--check`. Migrations apply in filename order, which
+is the order you meant only while every prefix is the same width — `1, 2, 10` applies
+as `1, 10, 2`. Naming the prefix turns the check on:
 
 ```ts
 // sqlgen.config.ts
 export default defineConfig({
-  checkMigrationOrder: {
-    prefixPattern: /^\d+/, // 0001_init.sql, 0002_add_users.sql, …
-  },
+  checkMigrationOrder: { prefixPattern: /^\d+/ }, // or --check-migration-order '^\d+'
 });
 ```
 
-```sh
-bun bun-sqlgen generate 'src/**/*.ts' --migrations db/migrations --check-migration-order '^\d+'
-```
-
-Naming a pattern is what turns the check on; there is no default, because only you know
-which convention your filenames were named for. The flag overrides the config.
-
-Migrations apply in filename order, which is the order you meant only while every
-filename carries a sequence prefix of the same width — `1, 2, 10` applies as
-`1, 10, 2`, building a schema production never had. The check fails on a migration with
-no prefix, on two claiming the same prefix, and on prefixes of differing widths. Gaps
-are fine.
-
-Width, not "is it a number", is what's checked: equal-width prefixes sort the same way
-in any positional scheme, so a scheme that doesn't number at all is held to its own
-terms — `/^[a-z]{4}_/` for `aaaa_init.sql`, `/^\d{14}_/` for a timestamp convention.
+It fails on a migration with no prefix, on two sharing one, and on prefixes of differing
+widths; gaps are fine. Width is the whole rule, so an unnumbered scheme works on its own
+terms: `/^[a-z]{4}_/`, `/^\d{14}_/`.
 
 Commit the generated file and run `--check` in CI so an edited query can never
 type-check against a stale shape. The
@@ -245,16 +229,13 @@ export default defineConfig({
   // rewrite/strip statements PGlite can't run, per migration file (CREATE INDEX
   // CONCURRENTLY can't run inside the transaction a multi-statement file applies in).
   transformMigration: ({ sql }) => sql.replace(/\bCONCURRENTLY\b/g, ''),
-  // require every migration to be numbered 0001, 0002, … so filename order
-  // (the order they apply in) is the order they were meant to run in.
-  checkMigrationOrder: { prefixPattern: /^\d+/ },
 });
 ```
 
 `defineConfig` is optional — a plain `export default { … }` still works, but you
 lose the type-checking and autocompletion.
 
-A runnable walkthrough of the three schema-shaping fields lives in the
+A runnable walkthrough of all three fields lives in the
 [`with-config` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/with-config).
 `extensions` is Postgres-only; `prelude` and `transformMigration` apply to both
 dialects, and `dialect: 'sqlite'` selects SQLite (the `--dialect` flag overrides it).
