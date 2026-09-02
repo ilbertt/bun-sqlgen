@@ -31,9 +31,9 @@ export interface IGetDealSummariesResult {
 /** Result of query `ListDealDetails`. */
 export interface IListDealDetailsResult {
     deal_id: IDealsColumns["id"];
-    status: IDealsColumns["status"];
-    /** Amount, as the view formats it. */
-    amount: NonNullable<IDealDetailsColumns["amount"]>;
+    /** Lifecycle stage. */
+    status: NonNullable<IDealDetailsColumns["status"]>;
+    amount: IDealsColumns["amount"];
     email: IUsersColumns["email"];
     display_name: IUsersColumns["display_name"];
     /** Status, uppercased. */
@@ -125,9 +125,9 @@ export interface Queries {
 /** Columns of `deal_details`. */
 export interface IDealDetailsColumns {
     deal_id: string | null;
-    status: string | null;
-    /** Amount, as the view formats it. */
-    amount: `${number}` | null;
+    /** Lifecycle stage. */
+    status: "draft" | "won" | "lost" | null;
+    amount: string | null;
     email: string | null;
     display_name: string | null;
     /** Status, uppercased. */

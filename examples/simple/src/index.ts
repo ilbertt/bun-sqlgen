@@ -58,7 +58,7 @@ const dealDetails = await sql.ListDealDetails`
   WHERE status = ${'won'}
 `;
 console.log(dealDetails[0]?.status_upper); // string
-console.log(dealDetails[0]?.amount); // `${number}` — from the comment on `deal_details.amount`
+console.log(dealDetails[0]?.status); // 'draft' | 'won' | 'lost' — the view's own comment
 
 // Composition: the `byStatus` fragment is inlined, its param numbered before the outer one.
 const byStatus = sql`status = ${'won'}`;
