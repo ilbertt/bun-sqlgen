@@ -198,6 +198,10 @@ export interface IDeploymentsColumns {
     state: "pending" | "running" | "failed";
     /** Content hash of the built image. */
     digest: string;
+    /** Rendered deploy config. */
+    config: {
+        replicas: number;
+    } | null;
 }
 
 /** Schema of `deployments`. */
@@ -212,9 +216,13 @@ export interface IDeploymentsTable {
 export interface IDesiredDeploymentsColumns {
     deployment_id: string | null;
     /** The release's own state, beside the app's. */
-    deployment_state: string | null;
+    deployment_state: "pending" | "running" | "failed" | null;
     /** Digest the release should converge on. */
     deployment_digest: string | null;
+    /** Rendered deploy config. */
+    deployment_config: {
+        replicas: number;
+    } | null;
 }
 
 /** Schema of `desired_deployments`. */
@@ -348,7 +356,8 @@ export const schema = {
         _columns: {
             id: { _columnName: "id", _foreignKeys: {} },
             state: { _columnName: "state", _foreignKeys: {} },
-            digest: { _columnName: "digest", _foreignKeys: {} }
+            digest: { _columnName: "digest", _foreignKeys: {} },
+            config: { _columnName: "config", _foreignKeys: {} }
         },
         _indexes: {
             deployments_pkey: { _indexName: "deployments_pkey" }
@@ -363,7 +372,8 @@ export const schema = {
         _columns: {
             deployment_id: { _columnName: "deployment_id", _foreignKeys: {} },
             deployment_state: { _columnName: "deployment_state", _foreignKeys: {} },
-            deployment_digest: { _columnName: "deployment_digest", _foreignKeys: {} }
+            deployment_digest: { _columnName: "deployment_digest", _foreignKeys: {} },
+            deployment_config: { _columnName: "deployment_config", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}

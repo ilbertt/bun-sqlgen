@@ -162,7 +162,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     tables = emitSchema
       ? (await intro.tables()).map((table) => ({
           ...table,
-          columns: resolveTableColumns({ table, columnOverrides }),
+          columns: resolveTableColumns({ table, columnOverrides, viewColumns }),
         }))
       : [];
 
