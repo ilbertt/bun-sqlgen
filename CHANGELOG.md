@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.2] - 2026-09-02
+
+### 🐛 Bug Fixes
+
+- Layer the base column's comment into a view's schema entry (#36)
+- Layer a view's column comment over the base column's (#35)
+
 ## [0.6.1] - 2026-09-02
 
 ### 🐛 Bug Fixes
