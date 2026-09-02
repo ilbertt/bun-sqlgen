@@ -21,9 +21,9 @@ import type {
  * non-null iff it's NOT NULL *and* not on the nullable side of an outer join;
  * anything untraceable (expressions, aggregates, casts) is conservatively
  * nullable. Precedence: per-query `@notNull`/`@nullable` win, then the column's own
- * `COMMENT ON COLUMN` markers — the view's, where the query selected through one —
- * then the catalog/introspector defaults. The base TS type comes from the introspector
- * (`f.ts`); a column comment's `@type` overrides it.
+ * `COMMENT ON COLUMN` markers — where the query selected through a view, that view's
+ * layered over the base column's — then the catalog/introspector defaults. The base TS
+ * type comes from the introspector (`f.ts`); a column comment's `@type` overrides it.
  */
 export function resolveFields(input: {
   described: Pick<DescribeResult, 'fields' | 'provenance' | 'relations' | 'views'>;
@@ -38,7 +38,8 @@ export function resolveFields(input: {
     const prov = described.provenance?.[i];
     const source = resolveSource({ prov, catalog });
     // A query naming a view asked for the view's column, whatever the plan rewrote it
-    // into — so a comment on that column outranks the one on the base column beneath it.
+    // into — so a comment on that column outranks the one on the base column beneath it,
+    // marker by marker.
     const view = viewOverride({
       name: f.name,
       source,
@@ -46,21 +47,19 @@ export function resolveFields(input: {
       viewColumns: input.viewColumns,
       columnOverrides,
     });
-    // Otherwise a column comment matched either via provenance, or — for fields the
+    // The base column's comment, matched either via provenance, or — for fields the
     // planner emits as expressions (e.g. VIRTUAL generated columns) — by name within a
     // single in-scope relation.
-    const comment: ColumnOverride | undefined =
-      view?.override ??
-      (source
-        ? columnOverrides[source.table]?.[source.column]
-        : commentByName({
-            name: f.name,
-            // An expression that traced to one relation names its owner; otherwise every
-            // relation in scope is a candidate and only an unambiguous match counts.
-            relations:
-              prov?.kind === 'expr' && prov.relation ? [prov.relation] : described.relations,
-            columnOverrides,
-          }));
+    const base: ColumnOverride | undefined = source
+      ? columnOverrides[source.table]?.[source.column]
+      : commentByName({
+          name: f.name,
+          // An expression that traced to one relation names its owner; otherwise every
+          // relation in scope is a candidate and only an unambiguous match counts.
+          relations: prov?.kind === 'expr' && prov.relation ? [prov.relation] : described.relations,
+          columnOverrides,
+        });
+    const comment = layerComment({ view: view?.override, base });
 
     // A per-query `@type` is the most specific override there is: it names the exact
     // result column and gives its full TS type verbatim (nullability included), so it
@@ -126,8 +125,8 @@ export function resolveFields(input: {
       doc: comment?.doc,
       // The reference the emitter writes has to name a relation whose schema-block
       // column carries this type. A view's `@type` retypes only the view's entry, so
-      // that's the one to point at; without one, both agree and the base column — the
-      // more telling provenance — stays.
+      // that's the one to point at; without one the type came from the base column —
+      // its own `@type` or the introspector — and that's the entry that carries it.
       source: (view?.override.tsType ? view.column : source) ?? undefined,
     };
   });
@@ -219,6 +218,30 @@ function viewOverride(input: {
       matching((c) => c.source?.table === source.table && c.source.column === source.column)) ??
     matching((c) => c.column === input.name)
   );
+}
+
+/**
+ * A view column's comment layered over the base column's: each marker wins where the
+ * view declares one and falls through to the base column's where it doesn't, so a view
+ * comment carrying only prose documents the column without untyping it. `@notNull` and
+ * `@nullable` fall through together — a view declaring either has answered the question,
+ * and its answer replaces the base column's rather than sitting beside it.
+ */
+function layerComment(input: {
+  view: ColumnOverride | undefined;
+  base: ColumnOverride | undefined;
+}): ColumnOverride | undefined {
+  const { view, base } = input;
+  if (!view || !base) {
+    return view ?? base;
+  }
+  const nullability = view.notNull || view.nullable ? view : base;
+  return {
+    notNull: nullability.notNull,
+    nullable: nullability.nullable,
+    tsType: view.tsType ?? base.tsType,
+    doc: view.doc ?? base.doc,
+  };
 }
 
 // A comment override for a field name owned by exactly one in-scope relation.

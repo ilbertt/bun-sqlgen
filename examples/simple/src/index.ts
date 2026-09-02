@@ -60,6 +60,14 @@ const dealDetails = await sql.ListDealDetails`
 console.log(dealDetails[0]?.status_upper); // string
 console.log(dealDetails[0]?.status); // 'draft' | 'won' | 'lost' — the view's own comment
 
+// A view comment carrying only prose layers over the base column's instead of replacing
+// it: the JSDoc is the view's, the `@type` and the `@notNull` still the table's.
+const desired = await sql.ListDesiredDeployments`
+  SELECT deployment_state, deployment_digest FROM desired_deployments
+`;
+console.log(desired[0]?.deployment_state === 'failed'); // 'pending' | 'running' | 'failed'
+console.log(desired[0]?.deployment_digest.length); // string — not null, per the base column
+
 // Composition: the `byStatus` fragment is inlined, its param numbered before the outer one.
 const byStatus = sql`status = ${'won'}`;
 const search = await sql.SearchDeals`
