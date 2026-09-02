@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.1] - 2026-09-02
+
+### 🐛 Bug Fixes
+
+- Apply a view's own column comments to queries selecting through it (#32)
+
 ## [0.6.0] - 2026-09-01
 
 ### 🚀 Features
