@@ -31,11 +31,13 @@ export interface IGetDealSummariesResult {
 /** Result of query `ListDealDetails`. */
 export interface IListDealDetailsResult {
     deal_id: IDealsColumns["id"];
-    status: IDealsColumns["status"];
+    /** Lifecycle stage. */
+    status: NonNullable<IDealDetailsColumns["status"]>;
     amount: IDealsColumns["amount"];
     email: IUsersColumns["email"];
     display_name: IUsersColumns["display_name"];
-    status_upper: string | null;
+    /** Status, uppercased. */
+    status_upper: string;
 }
 
 /** Result of query `SearchDeals`. */
@@ -123,11 +125,13 @@ export interface Queries {
 /** Columns of `deal_details`. */
 export interface IDealDetailsColumns {
     deal_id: string | null;
-    status: string | null;
+    /** Lifecycle stage. */
+    status: "draft" | "won" | "lost" | null;
     amount: string | null;
     email: string | null;
     display_name: string | null;
-    status_upper: string | null;
+    /** Status, uppercased. */
+    status_upper: string;
 }
 
 /** Schema of `deal_details`. */

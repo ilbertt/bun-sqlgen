@@ -88,6 +88,12 @@ export interface DescribeResult {
   provenance: Provenance[] | null;
   /** Base tables in scope, for matching comment overrides and bare columns by name. */
   relations: string[];
+  /**
+   * Views the query names. Postgres expands a view before planning, so `relations` and
+   * `provenance` only ever mention the base tables underneath it — this is the one
+   * trace left that the query asked for the view.
+   */
+  views: string[];
 }
 
 /**
@@ -130,6 +136,16 @@ export interface ColumnSource {
   table: string;
   column: string;
 }
+
+/** One column of a view, and the base column it passes straight through. */
+export interface ViewColumn {
+  column: string;
+  /** Unset for a computed column, which has no single base column behind it. */
+  source?: ColumnSource;
+}
+
+/** view name -> its columns, in order. */
+export type ViewColumns = Record<string, ViewColumn[]>;
 
 export interface ResolvedField {
   name: string;
@@ -178,6 +194,8 @@ export interface Introspector {
   catalog: () => Promise<Catalog>;
   /** Per-column documentation/override comments (empty for engines without them). */
   columnComments: () => Promise<RawColumnComments>;
+  /** Each view's columns traced to the base column they pass through, for routing comments. */
+  viewColumns: () => Promise<ViewColumns>;
   /** Writable columns (not identity/generated), for SET-clause neutralization. */
   writableColumns: () => Promise<WritableColumns>;
   /** Every base relation with its columns, index names and constraint names. */

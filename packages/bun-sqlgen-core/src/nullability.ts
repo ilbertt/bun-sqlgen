@@ -12,6 +12,8 @@ import type {
   ResolvedField,
   ResultField,
   SchemaTable,
+  ViewColumn,
+  ViewColumns,
 } from '#types.ts';
 
 /**
@@ -19,32 +21,46 @@ import type {
  * non-null iff it's NOT NULL *and* not on the nullable side of an outer join;
  * anything untraceable (expressions, aggregates, casts) is conservatively
  * nullable. Precedence: per-query `@notNull`/`@nullable` win, then the column's own
- * `COMMENT ON COLUMN` markers, then the catalog/introspector defaults. The base TS
- * type comes from the introspector (`f.ts`); a column comment's `@type` overrides it.
+ * `COMMENT ON COLUMN` markers — the view's, where the query selected through one —
+ * then the catalog/introspector defaults. The base TS type comes from the introspector
+ * (`f.ts`); a column comment's `@type` overrides it.
  */
 export function resolveFields(input: {
-  described: Pick<DescribeResult, 'fields' | 'provenance' | 'relations'>;
+  described: Pick<DescribeResult, 'fields' | 'provenance' | 'relations' | 'views'>;
   catalog: Catalog;
   overrides: Overrides;
   columnOverrides: ColumnOverrides;
+  viewColumns: ViewColumns;
 }): ResolvedField[] {
   const { described, catalog, overrides, columnOverrides } = input;
   // biome-ignore lint/complexity/useMaxParams: native map callback reads cleaner with the index
   return described.fields.map((f, i): ResolvedField => {
     const prov = described.provenance?.[i];
     const source = resolveSource({ prov, catalog });
-    // A column comment matched either via provenance, or — for fields the planner
-    // emits as expressions (e.g. VIRTUAL generated columns) — by name within a
+    // A query naming a view asked for the view's column, whatever the plan rewrote it
+    // into — so a comment on that column outranks the one on the base column beneath it.
+    const view = viewOverride({
+      name: f.name,
+      source,
+      views: described.views,
+      viewColumns: input.viewColumns,
+      columnOverrides,
+    });
+    // Otherwise a column comment matched either via provenance, or — for fields the
+    // planner emits as expressions (e.g. VIRTUAL generated columns) — by name within a
     // single in-scope relation.
-    const comment: ColumnOverride | undefined = source
-      ? columnOverrides[source.table]?.[source.column]
-      : commentByName({
-          name: f.name,
-          // An expression that traced to one relation names its owner; otherwise every
-          // relation in scope is a candidate and only an unambiguous match counts.
-          relations: prov?.kind === 'expr' && prov.relation ? [prov.relation] : described.relations,
-          columnOverrides,
-        });
+    const comment: ColumnOverride | undefined =
+      view?.override ??
+      (source
+        ? columnOverrides[source.table]?.[source.column]
+        : commentByName({
+            name: f.name,
+            // An expression that traced to one relation names its owner; otherwise every
+            // relation in scope is a candidate and only an unambiguous match counts.
+            relations:
+              prov?.kind === 'expr' && prov.relation ? [prov.relation] : described.relations,
+            columnOverrides,
+          }));
 
     // A per-query `@type` is the most specific override there is: it names the exact
     // result column and gives its full TS type verbatim (nullability included), so it
@@ -108,7 +124,11 @@ export function resolveFields(input: {
       reason,
       note,
       doc: comment?.doc,
-      source: source ?? undefined,
+      // The reference the emitter writes has to name a relation whose schema-block
+      // column carries this type. A view's `@type` retypes only the view's entry, so
+      // that's the one to point at; without one, both agree and the base column — the
+      // more telling provenance — stays.
+      source: (view?.override.tsType ? view.column : source) ?? undefined,
     };
   });
 }
@@ -162,6 +182,43 @@ function commentNotNull(input: {
     : input.comment?.nullable === true
       ? false
       : input.fallback;
+}
+
+/**
+ * The commented view column a result field came through, when the query names a view
+ * that owns one. A pass-through column matches on the base column it resolves to, so
+ * `SELECT status AS s FROM v` still finds `v.status`; a computed column, which has no
+ * base column, matches on its name. Either way only an unambiguous match counts —
+ * two views passing the same base column through say nothing about which was meant.
+ *
+ * The base column is as far as this can see: a query joining a view to the very table
+ * underneath it reads one column in the plan, so selecting it from either side takes
+ * the view's comment.
+ */
+function viewOverride(input: {
+  name: string;
+  source: ColumnSource | null;
+  views: string[];
+  viewColumns: ViewColumns;
+  columnOverrides: ColumnOverrides;
+}): { column: ColumnSource; override: ColumnOverride } | undefined {
+  const { source } = input;
+  const matching = (predicate: (column: ViewColumn) => boolean) => {
+    const hits = input.views.flatMap((view) =>
+      (input.viewColumns[view] ?? [])
+        .filter((column) => predicate(column) && input.columnOverrides[view]?.[column.column])
+        .map((column) => ({
+          column: { table: view, column: column.column },
+          override: input.columnOverrides[view]![column.column]!,
+        })),
+    );
+    return hits.length === 1 ? hits[0] : undefined;
+  };
+  return (
+    (source &&
+      matching((c) => c.source?.table === source.table && c.source.column === source.column)) ??
+    matching((c) => c.column === input.name)
+  );
 }
 
 // A comment override for a field name owned by exactly one in-scope relation.
