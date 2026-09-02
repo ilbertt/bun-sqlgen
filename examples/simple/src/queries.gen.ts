@@ -40,6 +40,14 @@ export interface IListDealDetailsResult {
     status_upper: string;
 }
 
+/** Result of query `ListDesiredDeployments`. */
+export interface IListDesiredDeploymentsResult {
+    /** The release's own state, beside the app's. */
+    deployment_state: IDeploymentsColumns["state"];
+    /** Digest the release should converge on. */
+    deployment_digest: IDeploymentsColumns["digest"];
+}
+
 /** Result of query `SearchDeals`. */
 export interface ISearchDealsResult {
     id: IDealsColumns["id"];
@@ -110,6 +118,7 @@ export interface Queries {
     ListDeals: IListDealsResult;
     GetDealSummaries: IGetDealSummariesResult;
     ListDealDetails: IListDealDetailsResult;
+    ListDesiredDeployments: IListDesiredDeploymentsResult;
     SearchDeals: ISearchDealsResult;
     RecentDeals: IRecentDealsResult;
     GetDealMeta: IGetDealMetaResult;
@@ -180,6 +189,40 @@ export interface IDealsTable {
     relationType: (typeof schema)["deals"]["_relationType"];
     indexes: keyof (typeof schema)["deals"]["_indexes"];
     constraints: keyof (typeof schema)["deals"]["_constraints"];
+}
+
+/** Columns of `deployments`. */
+export interface IDeploymentsColumns {
+    id: string;
+    /** Lifecycle state. */
+    state: "pending" | "running" | "failed";
+    /** Content hash of the built image. */
+    digest: string;
+}
+
+/** Schema of `deployments`. */
+export interface IDeploymentsTable {
+    columns: IDeploymentsColumns;
+    relationType: (typeof schema)["deployments"]["_relationType"];
+    indexes: keyof (typeof schema)["deployments"]["_indexes"];
+    constraints: keyof (typeof schema)["deployments"]["_constraints"];
+}
+
+/** Columns of `desired_deployments`. */
+export interface IDesiredDeploymentsColumns {
+    deployment_id: string | null;
+    /** The release's own state, beside the app's. */
+    deployment_state: string | null;
+    /** Digest the release should converge on. */
+    deployment_digest: string | null;
+}
+
+/** Schema of `desired_deployments`. */
+export interface IDesiredDeploymentsTable {
+    columns: IDesiredDeploymentsColumns;
+    relationType: (typeof schema)["desired_deployments"]["_relationType"];
+    indexes: keyof (typeof schema)["desired_deployments"]["_indexes"];
+    constraints: keyof (typeof schema)["desired_deployments"]["_constraints"];
 }
 
 /** Columns of `payments`. */
@@ -299,6 +342,32 @@ export const schema = {
             deals_user_id_fkey: { _constraintName: "deals_user_id_fkey" }
         }
     },
+    deployments: {
+        _relationName: "deployments",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            state: { _columnName: "state", _foreignKeys: {} },
+            digest: { _columnName: "digest", _foreignKeys: {} }
+        },
+        _indexes: {
+            deployments_pkey: { _indexName: "deployments_pkey" }
+        },
+        _constraints: {
+            deployments_pkey: { _constraintName: "deployments_pkey" }
+        }
+    },
+    desired_deployments: {
+        _relationName: "desired_deployments",
+        _relationType: "view",
+        _columns: {
+            deployment_id: { _columnName: "deployment_id", _foreignKeys: {} },
+            deployment_state: { _columnName: "deployment_state", _foreignKeys: {} },
+            deployment_digest: { _columnName: "deployment_digest", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
     payments: {
         _relationName: "payments",
         _relationType: "table",
@@ -371,6 +440,8 @@ export interface Tables {
     deal_details: IDealDetailsTable;
     deal_meta: IDealMetaTable;
     deals: IDealsTable;
+    deployments: IDeploymentsTable;
+    desired_deployments: IDesiredDeploymentsTable;
     payments: IPaymentsTable;
     tenant_notes: ITenantNotesTable;
     tenants: ITenantsTable;
