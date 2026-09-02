@@ -182,6 +182,24 @@ console.log(kind);
 const noIndex: DatabaseTables['deal_details']['indexes'] = 'anything';
 console.log(noIndex);
 
+// A view column's own schema entry layers over the base column's comment the same way a
+// query through the view does, so both report one type — and `deployment_config`, which
+// the view doesn't comment at all, inherits the base column's `@type` and JSDoc outright.
+// Nullability stays the view's answer: a view is free to LEFT JOIN, and nothing tracks
+// `NOT NULL` through one, so the pinned `deployments.digest` is still nullable here.
+type DesiredDeploymentRow = DatabaseTables['desired_deployments']['columns'];
+const desiredRow: DesiredDeploymentRow = {
+  deployment_id: '1',
+  deployment_state: 'running',
+  deployment_digest: null,
+  deployment_config: { replicas: 2 },
+};
+console.log(desiredRow.deployment_state, desiredRow.deployment_config?.replicas);
+
+// @ts-expect-error — `deployment_state` carries the base column's `@type`, not `string`
+const badState: DesiredDeploymentRow = { ...desiredRow, deployment_state: 'nope' };
+console.log(badState);
+
 // Foreign keys hang off the column they constrain, so a reference can be followed
 // without knowing the constraint's name up front.
 const dealsToUsers = schema.deals._columns.user_id._foreignKeys.deals_user_id_fkey;

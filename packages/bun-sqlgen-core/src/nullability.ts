@@ -135,16 +135,26 @@ export function resolveFields(input: {
 /**
  * The same resolution for a base relation's own columns: a column comment's `@type`
  * overrides the introspector's type, its `@notNull`/`@nullable` override the schema's,
- * and its prose becomes the field's JSDoc. No query is in scope here, so there are no
+ * and its prose becomes the field's JSDoc. A view's column layers over the base column
+ * it passes through, as it does in a query. No query is in scope here, so there are no
  * per-query pragmas and no outer-join widening — just the column as the schema declares it.
  */
 export function resolveTableColumns(input: {
   table: SchemaTable;
   columnOverrides: ColumnOverrides;
+  viewColumns: ViewColumns;
 }): EmitColumn[] {
   const overrides = input.columnOverrides[input.table.name] ?? {};
+  // What each column passes through, for a view; a table passes through nothing.
+  const passThrough = new Map(
+    (input.viewColumns[input.table.name] ?? []).map((c) => [c.column, c.source]),
+  );
   return input.table.columns.map((column): EmitColumn => {
-    const comment = overrides[column.name];
+    const source = passThrough.get(column.name);
+    const comment = layerComment({
+      view: overrides[column.name],
+      base: inherited(source && input.columnOverrides[source.table]?.[source.column]),
+    });
     const { ts, note } = commentType({ base: column, comment });
     return {
       name: column.name,
@@ -242,6 +252,17 @@ function layerComment(input: {
     tsType: view.tsType ?? base.tsType,
     doc: view.doc ?? base.doc,
   };
+}
+
+/**
+ * The part of a base column's comment a view column inherits in the schema block: the
+ * value reaches the view unchanged, so `@type` and the prose travel with it. `@notNull`
+ * doesn't — a view is free to `LEFT JOIN`, and a relation's own columns are resolved
+ * with no query in scope, so nothing here could tell that it hasn't. Queries selecting
+ * through the view do carry it: they have the plan, and its outer joins, to widen by.
+ */
+function inherited(base: ColumnOverride | undefined): ColumnOverride | undefined {
+  return base?.tsType || base?.doc ? { tsType: base.tsType, doc: base.doc } : undefined;
 }
 
 // A comment override for a field name owned by exactly one in-scope relation.
