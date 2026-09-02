@@ -1,8 +1,10 @@
 import { PGlite } from '@electric-sql/pglite';
 import { applyMigrations } from '#introspect/migrations.ts';
+import { parseRelations } from '#introspect/sql-text.ts';
 import { oidToTs, PG_OID } from '#oids.ts';
 import type {
   Catalog,
+  ColumnSource,
   DescribeResult,
   Introspector,
   IntrospectorOptions,
@@ -14,6 +16,7 @@ import type {
   SchemaTable,
   TypeCatalog,
   TypeInfo,
+  ViewColumns,
   WritableColumns,
 } from '#types.ts';
 
@@ -38,8 +41,17 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
     return typeCatalog;
   }
 
+  // The views a query could be naming, resolved once. Only plain views: a materialized
+  // view is a real relation, so the plan names it and provenance finds it unaided.
+  let views: Map<string, string> | null = null;
+  async function getViews(): Promise<Map<string, string>> {
+    views ??= await loadViews(db);
+    return views;
+  }
+
   async function describe(sql: string): Promise<DescribeResult> {
     const types = await getTypes();
+    const knownViews = await getViews();
     // describeQuery throws the real Postgres error on bad SQL.
     const d = await db.describeQuery(sql);
     const params = d.queryParams.map((p) => p.dataTypeID);
@@ -64,7 +76,33 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
     } catch {
       provenance = null; // everything falls back to nullable
     }
-    return { fields, provenance, relations };
+    return {
+      fields,
+      provenance,
+      relations,
+      views: parseRelations(sql).filter((r) => knownViews.has(r)),
+    };
+  }
+
+  // Every view's columns, each traced to the base column it passes through. Describing
+  // `SELECT *` puts the view's own body through the same plan analysis a query gets, so
+  // a pass-through column reports the base column it reads and a computed one reports
+  // an expression — exactly the distinction that decides how a comment on it matches.
+  async function viewColumns(): Promise<ViewColumns> {
+    const map: ViewColumns = Object.create(null);
+    for (const [name, qualified] of await getViews()) {
+      try {
+        const described = await describe(`SELECT * FROM ${qualified}`);
+        // biome-ignore lint/complexity/useMaxParams: native map callback needs the index
+        map[name] = described.fields.map((field, i) => ({
+          column: field.name,
+          source: passThrough(described.provenance?.[i]),
+        }));
+      } catch {
+        // A view that can't be described maps to nothing; its comments still match by name.
+      }
+    }
+    return map;
   }
 
   // Per-column NOT NULL — the piece describeQuery can't give us.
@@ -223,8 +261,41 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
     return [...new Map([...byRelation.values()].map((t) => [t.name, t])).values()];
   }
 
-  return { describe, catalog, columnComments, writableColumns, tables, close: () => db.close() };
+  return {
+    describe,
+    catalog,
+    columnComments,
+    viewColumns,
+    writableColumns,
+    tables,
+    close: () => db.close(),
+  };
 }
+
+// The base column a view column reads straight through. A computed column reaches the
+// plan as its expression, and so carries no single column to attribute it to.
+const passThrough = (prov: Provenance | undefined): ColumnSource | undefined =>
+  prov?.kind === 'column' && prov.table ? { table: prov.table, column: prov.column } : undefined;
+
+// Plain views only, keyed by the bare name the rest of the pipeline uses and valued by
+// the qualified one it takes to select from them unambiguously.
+async function loadViews(db: PGlite): Promise<Map<string, string>> {
+  const r = await db.query<ViewRow>(`
+    SELECT n.nspname AS schema_name, c.relname AS table_name
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relkind = 'v' AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+    ORDER BY n.nspname, c.relname
+  `);
+  return new Map(
+    r.rows.map((row) => [
+      row.table_name,
+      `${quoteIdent(row.schema_name)}.${quoteIdent(row.table_name)}`,
+    ]),
+  );
+}
+
+const quoteIdent = (s: string): string => `"${s.replace(/"/g, '""')}"`;
 
 const qualified = (row: { schema_name: string; table_name: string }): string =>
   `${row.schema_name}.${row.table_name}`;
@@ -289,6 +360,11 @@ interface CommentRow {
   table_name: string;
   column_name: string;
   description: string;
+}
+
+interface ViewRow {
+  schema_name: string;
+  table_name: string;
 }
 
 interface WritableRow {

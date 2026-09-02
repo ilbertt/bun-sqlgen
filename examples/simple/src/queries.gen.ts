@@ -32,10 +32,12 @@ export interface IGetDealSummariesResult {
 export interface IListDealDetailsResult {
     deal_id: IDealsColumns["id"];
     status: IDealsColumns["status"];
-    amount: IDealsColumns["amount"];
+    /** Amount, as the view formats it. */
+    amount: NonNullable<IDealDetailsColumns["amount"]>;
     email: IUsersColumns["email"];
     display_name: IUsersColumns["display_name"];
-    status_upper: string | null;
+    /** Status, uppercased. */
+    status_upper: string;
 }
 
 /** Result of query `SearchDeals`. */
@@ -124,10 +126,12 @@ export interface Queries {
 export interface IDealDetailsColumns {
     deal_id: string | null;
     status: string | null;
-    amount: string | null;
+    /** Amount, as the view formats it. */
+    amount: `${number}` | null;
     email: string | null;
     display_name: string | null;
-    status_upper: string | null;
+    /** Status, uppercased. */
+    status_upper: string;
 }
 
 /** Schema of `deal_details`. */

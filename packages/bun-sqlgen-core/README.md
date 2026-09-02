@@ -35,9 +35,18 @@ the column alone.
 The describe step runs against a dialect-specific introspector under `introspect/`,
 chosen by `dialect` (default `postgres`): **PGlite** for Postgres (`describeQuery`
 OIDs + `EXPLAIN VERBOSE` provenance) or **`bun:sqlite`** for SQLite (prepared-statement
-`declaredTypes`/`columnTypes` + a FROM/JOIN scan). Both satisfy one `Introspector`
-interface and resolve each field's TS type internally, so the nullability/emit stages
-stay engine-agnostic.
+`declaredTypes`/`columnTypes` + the shared FROM/JOIN scan in `introspect/sql-text.ts`).
+Both satisfy one `Introspector` interface and resolve each field's TS type internally,
+so the nullability/emit stages stay engine-agnostic.
+
+**Views** are the one thing provenance can't see: Postgres expands a view before
+planning, so the plan reports the base tables and a comment on the view's own column
+would never be read. `DescribeResult.views` therefore comes from scanning the query
+text — the only place the view is still named — and `Introspector.viewColumns()`
+describes each view's `SELECT *` to learn which base column each of its columns passes
+through. A field then matches a view column by that base column (so an aliased
+`SELECT amount AS a` still finds it) or, for a computed one, by name. A materialized
+view needs none of this: it's a real relation, and the plan names it.
 
 TypeScript and PGlite are runtime dependencies (the generator walks the TS AST and
 boots a Postgres); the SQLite engine is `bun:sqlite`, built into Bun. The CLI

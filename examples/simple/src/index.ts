@@ -50,13 +50,15 @@ const summaries = await sql.GetDealSummaries`
 `;
 console.log(summaries[0]?.fully_paid, summaries[0]?.payment_count); // boolean | null, string | null
 
-// Through a VIEW: base columns keep their nullability; the computed `status_upper` is nullable.
+// Through a VIEW: base columns keep their nullability, and the view's own column
+// comments apply — including on `status_upper`, which no base column backs.
 const dealDetails = await sql.ListDealDetails`
   SELECT deal_id, status, amount, email, display_name, status_upper
   FROM deal_details
   WHERE status = ${'won'}
 `;
-console.log(dealDetails[0]?.status_upper); // string | null
+console.log(dealDetails[0]?.status_upper); // string
+console.log(dealDetails[0]?.amount); // `${number}` — from the comment on `deal_details.amount`
 
 // Composition: the `byStatus` fragment is inlined, its param numbered before the outer one.
 const byStatus = sql`status = ${'won'}`;

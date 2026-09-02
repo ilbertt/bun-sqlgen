@@ -311,6 +311,18 @@ widening still applies on top (a `@notNull` column pulled through a `LEFT JOIN` 
 still nullable in that query). Only the `@…` tokens are read for behavior; the
 rest of the comment is carried through as documentation.
 
+**Views take their own comments.** Comment a view's column and a query selecting
+through the view gets that answer instead of the one on the base column it passes
+through — including on computed columns, which have no base column to comment:
+
+```sql
+COMMENT ON COLUMN deal_details.amount IS 'Amount, as the view formats it. @type `${number}`';
+COMMENT ON COLUMN deal_details.status_upper IS 'Status, uppercased. @notNull';
+```
+
+A query has to *name* the view for this to apply; reaching the same column through
+the base table gets the base table's comment, as it should.
+
 ## Boundaries
 
 - **Dynamic fragments** composed at runtime (`` sql`... ${sql(cols)} ...` ``) can't

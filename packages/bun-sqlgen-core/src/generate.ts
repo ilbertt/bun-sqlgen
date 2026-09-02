@@ -151,6 +151,9 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   try {
     const catalog = await intro.catalog();
     const columnOverrides = parseColumnComments(await intro.columnComments());
+    // What each view column passes through, so a query selecting from a view gets the
+    // view's comments — the plan it's typed from has already rewritten the view away.
+    const viewColumns = await intro.viewColumns();
     const writable = await intro.writableColumns();
 
     // The schema block reuses the column comments, so a `@type`/`@notNull` declared once
@@ -190,7 +193,13 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
         continue; // type what we can; report the rest in the summary
       }
       const overrides = parseOverrides(q.sql);
-      const resultFields = resolveFields({ described, catalog, overrides, columnOverrides });
+      const resultFields = resolveFields({
+        described,
+        catalog,
+        overrides,
+        columnOverrides,
+        viewColumns,
+      });
       emitModels.push({ name: q.name, resultFields });
       if (q.neutralized) {
         neutralized.push(q.name);

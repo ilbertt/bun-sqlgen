@@ -1,5 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { applyMigrations } from '#introspect/migrations.ts';
+import { IDENT, parseRelations, stripNoise, unquoteIdent } from '#introspect/sql-text.ts';
 import type { TsType } from '#oids.ts';
 import type {
   Catalog,
@@ -10,6 +11,7 @@ import type {
   RawColumnComments,
   ResultField,
   SchemaTable,
+  ViewColumns,
   WritableColumns,
 } from '#types.ts';
 
@@ -84,7 +86,9 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
             : { kind: 'expr', expr: name, outerNullable },
         );
       }
-      return Promise.resolve({ fields, provenance, relations });
+      // `views` stays empty: without column comments there is nothing a view could
+      // override, so the relations list alone answers everything downstream asks.
+      return Promise.resolve({ fields, provenance, relations, views: [] });
     } finally {
       stmt.finalize();
     }
@@ -110,6 +114,12 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
   // SQLite has no column comments, so schema-level `@type`/`@notNull` overrides are
   // unavailable; per-query `@notNull`/`@nullable` annotations still apply.
   function columnComments(): Promise<RawColumnComments> {
+    return Promise.resolve({});
+  }
+
+  // Which base column a view column passes through only matters for routing a comment
+  // to it, and there are no comments here.
+  function viewColumns(): Promise<ViewColumns> {
     return Promise.resolve({});
   }
 
@@ -180,6 +190,7 @@ export async function createSqliteIntrospector(opts: IntrospectorOptions): Promi
     describe,
     catalog,
     columnComments,
+    viewColumns,
     writableColumns,
     tables,
     close: () => Promise.resolve(db.close()),
@@ -226,44 +237,16 @@ function hasOuterJoin(sql: string): boolean {
   return OUTER_JOIN.test(sql);
 }
 
-const IDENT = String.raw`"[^"]*"|\`[^\`]*\`|\[[^\]]*\]|[A-Za-z_]\w*`;
-const FROM_JOIN = new RegExp(String.raw`\b(?:from|join)\s+(${IDENT})(?:\s*\.\s*(${IDENT}))?`, 'gi');
-
-// Base relations in scope, scanned from FROM/JOIN clauses. Subqueries (next token is
-// `(`) are skipped; CTE names that slip through simply miss in the catalog. Used to
-// resolve bare result columns to their owning table.
-function parseRelations(sql: string): string[] {
-  const out = new Set<string>();
-  for (const m of sql.matchAll(FROM_JOIN)) {
-    out.add(unquoteIdent(m[2] ?? m[1]!)); // `schema.table` → table
-  }
-  return [...out];
-}
-
 const CONSTRAINT_NAME = new RegExp(String.raw`\bCONSTRAINT\s+(${IDENT})`, 'gi');
-// `sqlite_master.sql` is the statement as written, comments and literals included, and
-// any of those can contain the word CONSTRAINT. Blank them before scanning.
-const DDL_NOISE = /--[^\n]*|\/\*[\s\S]*?\*\/|'(?:[^']|'')*'/g;
 
 // SQLite keeps no catalog of constraint names — only the `CREATE TABLE` text has them.
 // So explicitly named constraints are read from the DDL; the unnamed ones (a bare
-// `PRIMARY KEY` / `CHECK (…)`, every foreign key) have no name to report at all.
+// `PRIMARY KEY` / `CHECK (…)`, every foreign key) have no name to report at all. The
+// statement is stored as written, so its comments and literals are blanked first —
+// any of those can contain the word CONSTRAINT.
 function parseConstraintNames(ddl: string): string[] {
-  const scanned = ddl.replace(DDL_NOISE, ' ');
+  const scanned = stripNoise(ddl);
   return [...new Set([...scanned.matchAll(CONSTRAINT_NAME)].map((m) => unquoteIdent(m[1]!)))];
-}
-
-function unquoteIdent(s: string): string {
-  if (s.startsWith('"') && s.endsWith('"')) {
-    return s.slice(1, -1).replace(/""/g, '"');
-  }
-  if (s.startsWith('`') && s.endsWith('`')) {
-    return s.slice(1, -1);
-  }
-  if (s.startsWith('[') && s.endsWith(']')) {
-    return s.slice(1, -1);
-  }
-  return s;
 }
 
 function quoteIdent(s: string): string {
