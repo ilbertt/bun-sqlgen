@@ -1,7 +1,7 @@
 import { withTypes } from '@repo/bun-sqlgen';
 import { SQL } from 'bun';
 
-const sql = withTypes(new SQL(Bun.env.DATABASE_URL ?? 'postgres://localhost/example'));
+const sql = withTypes(new SQL()); // connects with DATABASE_URL
 
 // Each field is typed as `Bun.sql` returns it, and `display_name` — the one column
 // without NOT NULL — is the only nullable one.
