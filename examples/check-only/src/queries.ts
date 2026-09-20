@@ -3,7 +3,7 @@
 // Queries are named so the checker discovers them; `withTypes` is what lets a named
 // tag forward to Bun's `sql` and run at runtime. Because we never emit the registry,
 // each name is unknown to `tsc` — the `@ts-expect-error` on each says so on purpose,
-// so `check:types` stays green without excluding the file. See `simple` for the
+// so `check:types` stays green without excluding the file. See `basic` for the
 // typed lane, where generation turns these names into checked row types.
 import { withTypes } from '@repo/bun-sqlgen';
 import { SQL } from 'bun';

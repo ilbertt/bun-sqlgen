@@ -1,5 +1,5 @@
 {
-  "name": "@repo/example-simple",
+  "name": "@repo/example-basic",
   "private": true,
   "type": "module",
   "scripts": {

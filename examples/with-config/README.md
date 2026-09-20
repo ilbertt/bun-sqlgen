@@ -3,7 +3,7 @@
 Shows how a [`sqlgen.config.ts`](./sqlgen.config.ts) shapes the throwaway
 introspection DB so migrations that depend on extensions, app-provided functions,
 or `CONCURRENTLY` apply the same way they would against production. Builds on the
-[`simple`](../simple) example — see it first for the basics of
+[`basic`](../basic) example — see it first for the basics of
 [`@ilbertt/bun-sqlgen`](../../packages/bun-sqlgen/pkg/README.md).
 
 The config is auto-discovered because codegen runs from this directory; each field

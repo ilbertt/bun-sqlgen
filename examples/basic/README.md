@@ -1,4 +1,4 @@
-# simple
+# basic
 
 A minimal example using [`@ilbertt/bun-sqlgen`](../../packages/bun-sqlgen/pkg/README.md)
 to generate typed result interfaces for `Bun.sql` queries. The queries are named
