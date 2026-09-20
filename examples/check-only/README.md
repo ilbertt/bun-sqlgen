@@ -7,7 +7,7 @@ missing column, a renamed table, a bad cast), writing and committing nothing.
 
 Reach for this lane when you want CI to guard your raw SQL but don't consume the
 typed registry. For the typed lane — generated row types with `tsc`-checked call
-sites — see [`simple`](../simple). Because the registry is never generated, each
+sites — see [`basic`](../basic). Because the registry is never generated, each
 query name is unknown to `tsc`, so every query carries a `// @ts-expect-error`;
 `tsc` still runs over the rest of the file, and the describe-time `--check-queries`
 pass is the real gate (`check:types` runs it before `tsc`).

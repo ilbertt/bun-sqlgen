@@ -2,7 +2,7 @@
 
 A minimal **SQLite** example using
 [`@ilbertt/bun-sqlgen`](../../packages/bun-sqlgen/pkg/README.md) to generate typed
-result interfaces. Same as the [`simple`](../simple) example, but the client is
+result interfaces. Same as the [`basic`](../basic) example, but the client is
 `new SQL('sqlite://:memory:')` and codegen introspects with `--dialect sqlite` (via
 `bun:sqlite`). The inline comments call out SQLite-specific behavior — `BOOLEAN` /
 `BIGINT` → `number`, `DATETIME` → `string`, and the conservative outer-join
