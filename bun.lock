@@ -24,6 +24,15 @@
         "typescript": "catalog:",
       },
     },
+    "examples/native-sql": {
+      "name": "@repo/example-native-sql",
+      "devDependencies": {
+        "@repo/bun-sqlgen": "workspace:*",
+        "@repo/typescript-config": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "examples/simple": {
       "name": "@repo/example-simple",
       "devDependencies": {

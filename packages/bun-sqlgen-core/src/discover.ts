@@ -18,8 +18,9 @@ function placeholderFor(dialect: Dialect): (n: number) => string {
  * tag's type is Bun's `SQL` (or our `withTypes` wrapper, an intersection over it)
  * — so aliases/re-exports/`Bun.sql`/wrapped clients all resolve.
  *
- * A query is a named tag — `sql.MyQuery\`...\`` — taking its name from the property.
- * A bare `sql\`...\`` is a composable fragment, not a query.
+ * A query is either a named tag — `sql.MyQuery\`...\`` — or a bare tag whose
+ * result type indexes the generated registry — `sql<Queries['MyQuery'][]>\`...\``.
+ * An untyped bare `sql\`...\`` is a composable fragment, not a query.
  */
 const COMPILER_OPTIONS: ts.CompilerOptions = {
   target: ts.ScriptTarget.ES2022,
@@ -109,12 +110,13 @@ function discover(input: {
   // see the wrapper type.
   const bindings = collectTypedSqlBindings({ sf, checker });
 
-  // A query is a named tag, `sql.Name\`...\``; its name is the property. A bare
-  // `sql\`...\`` (no property) is a composable fragment, not a query.
+  // A query is a named tag, `sql.Name\`...\``, or a bare tag explicitly typed
+  // from the generated registry, `sql<Queries['Name'][]>\`...\``. Other bare tags
+  // stay fragments, including Bun's handwritten `sql<CustomRows[]>` escape hatch.
   const found: Array<{ node: ts.TaggedTemplateExpression; name: string }> = [];
   (function scan(node: ts.Node): void {
     if (ts.isTaggedTemplateExpression(node)) {
-      const name = namedTag({ node, checker, bindings });
+      const name = namedTag({ node, checker, bindings }) ?? registryTypedTag({ node, checker });
       if (name) {
         found.push({ node, name });
       }
@@ -148,6 +150,49 @@ function discover(input: {
 interface TypedSqlBindings {
   vars: Set<string>;
   fields: Set<string>;
+}
+
+// `sql<Queries['MyQuery'][]>\`...\`` or
+// `sql<Array<Queries['MyQuery']>>\`...\``: Bun's generic is the complete resolved
+// value, so the registry member (a row) must be wrapped in an array. The literal
+// key is also the query name, which keeps first-run generation independent of the
+// generated module resolving successfully.
+function registryTypedTag(input: {
+  node: ts.TaggedTemplateExpression;
+  checker: ts.TypeChecker;
+}): string | null {
+  const { node, checker } = input;
+  if (!isBunSqlType({ expr: node.tag, checker }) || node.typeArguments?.length !== 1) {
+    return null;
+  }
+  const resultType = node.typeArguments[0]!;
+  const rowType = ts.isArrayTypeNode(resultType)
+    ? resultType.elementType
+    : arrayElementType(resultType);
+  if (!rowType || !ts.isIndexedAccessTypeNode(rowType)) {
+    return null;
+  }
+  if (
+    !ts.isTypeReferenceNode(rowType.objectType) ||
+    !ts.isIdentifier(rowType.objectType.typeName) ||
+    rowType.objectType.typeName.text !== 'Queries'
+  ) {
+    return null;
+  }
+  const key = rowType.indexType;
+  return ts.isLiteralTypeNode(key) && ts.isStringLiteralLike(key.literal) ? key.literal.text : null;
+}
+
+function arrayElementType(type: ts.TypeNode): ts.TypeNode | null {
+  if (
+    !ts.isTypeReferenceNode(type) ||
+    !ts.isIdentifier(type.typeName) ||
+    type.typeName.text !== 'Array' ||
+    type.typeArguments?.length !== 1
+  ) {
+    return null;
+  }
+  return type.typeArguments[0]!;
 }
 
 // `sql.MyQuery\`...\``: a property-access tag whose object is a typed-SQL client and

@@ -1,0 +1,20 @@
+{
+  "name": "@repo/example-native-sql",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun codegen && bun build src/index.ts --outdir dist --target bun",
+    "codegen": "bun-sqlgen generate 'src/**/*.ts' --migrations src/db/migrations --package @repo/bun-sqlgen --no-schema",
+    "codegen:check": "bun-sqlgen generate 'src/**/*.ts' --migrations src/db/migrations --package @repo/bun-sqlgen --no-schema --check",
+    "check:types": "bun codegen:check && bun run --bun tsc"
+  },
+  "devDependencies": {
+    "@repo/bun-sqlgen": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  },
+  "imports": {
+    "#*": "./src/*"
+  }
+}
