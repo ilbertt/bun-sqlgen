@@ -8,7 +8,7 @@
 import { withTypes } from '@repo/bun-sqlgen';
 import { SQL } from 'bun';
 
-const sql = withTypes(new SQL(Bun.env.DATABASE_URL ?? 'postgres://localhost/example'));
+const sql = withTypes(new SQL('postgres://localhost/example'));
 
 export const listOpenTasks = (projectId: number) =>
   // @ts-expect-error — types intentionally not generated for this query; SQL still checked.

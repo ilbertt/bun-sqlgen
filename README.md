@@ -31,7 +31,7 @@ bun add @ilbertt/bun-sqlgen
    import { withTypes } from '@ilbertt/bun-sqlgen';
    import { SQL } from 'bun';
 
-   const sql = withTypes(new SQL(Bun.env.DATABASE_URL!));
+   const sql = withTypes(new SQL('postgres://localhost/example'));
 
    export async function getUser(id: number) {
      const [user] = await sql.GetUser`

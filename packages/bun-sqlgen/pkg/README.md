@@ -35,7 +35,7 @@ bun add @ilbertt/bun-sqlgen
    import { withTypes } from '@ilbertt/bun-sqlgen';
    import { SQL } from 'bun';
 
-   const sql = withTypes(new SQL(Bun.env.DATABASE_URL!));
+   const sql = withTypes(new SQL('postgres://localhost/example'));
 
    export async function getUser(id: number) {
      const [user] = await sql.GetUser`
@@ -171,7 +171,7 @@ identical — Bun's `SQL` speaks SQLite through its `sqlite://` adapter, so you 
 the same `withTypes(new SQL(...))` client and `` sql.Name`...` `` tags:
 
 ```ts
-const sql = withTypes(new SQL('sqlite://app.db')); // or 'sqlite://:memory:'
+const sql = withTypes(new SQL('sqlite://app.db'));
 ```
 
 Select the engine with `--dialect sqlite` (or `dialect: 'sqlite'` in
