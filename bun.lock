@@ -15,6 +15,15 @@
         "typescript": "catalog:",
       },
     },
+    "examples/advanced": {
+      "name": "@repo/example-advanced",
+      "devDependencies": {
+        "@repo/bun-sqlgen": "workspace:*",
+        "@repo/typescript-config": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "examples/basic": {
       "name": "@repo/example-basic",
       "devDependencies": {
@@ -181,6 +190,8 @@
     "@repo/bun-sqlgen": ["@repo/bun-sqlgen@workspace:packages/bun-sqlgen"],
 
     "@repo/bun-sqlgen-core": ["@repo/bun-sqlgen-core@workspace:packages/bun-sqlgen-core"],
+
+    "@repo/example-advanced": ["@repo/example-advanced@workspace:examples/advanced"],
 
     "@repo/example-basic": ["@repo/example-basic@workspace:examples/basic"],
 
