@@ -1,7 +1,7 @@
 import { withTypes } from '@repo/bun-sqlgen';
 import { SQL } from 'bun';
 
-const sql = withTypes(new SQL(Bun.env.DATABASE_URL ?? 'sqlite://:memory:'));
+const sql = withTypes(new SQL('sqlite://:memory:'));
 
 // BOOLEAN and REAL both read back as `number` under Bun.SQL.
 const deals = await sql.ListDeals`

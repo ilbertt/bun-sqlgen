@@ -1,7 +1,7 @@
 import { withTypes } from '@repo/bun-sqlgen';
 import { SQL } from 'bun';
 
-const sql = withTypes(new SQL(Bun.env.DATABASE_URL ?? 'postgres://localhost/example'));
+const sql = withTypes(new SQL('postgres://localhost/example'));
 
 // The schema only applies in the throwaway DB because sqlgen.config.ts loaded the
 // citext extension, stubbed app_current_actor(), and stripped CONCURRENTLY. With
