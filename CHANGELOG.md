@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.3] - 2026-10-01
+
+### 🚜 Refactor
+
+- *(examples)* Pass a literal connection string to new SQL (#41)
+- *(examples)* Keep basic minimal, move the rest to advanced (#40)
+- *(examples)* Rename simple to basic (#42)
+
+### 📦 Build & Dependencies
+
+- Upgrade to bun 1.4.2 (#38)
+
+### ⚙️ Miscellaneous Tasks
+
+- Remove CLAUDE.md symlink and clarify PR guidance (#43)
+
 ## [0.6.2] - 2026-09-02
 
 ### 🐛 Bug Fixes
