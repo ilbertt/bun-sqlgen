@@ -15,7 +15,7 @@
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/bun": "catalog:",
-    "git-cliff": "^2.13.1",
+    "git-cliff": "^2.14.2",
     "typescript": "catalog:"
   }
 }
