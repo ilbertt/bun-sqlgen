@@ -12,7 +12,15 @@ query name is unknown to `tsc`, so every query carries a `// @ts-expect-error`;
 `tsc` still runs over the rest of the file, and the describe-time `--check-queries`
 pass is the real gate (`check:types` runs it before `tsc`).
 
-Break a query — select a column that doesn't exist — and `check:queries` fails with
-the real Postgres error, pointing at the file and line. `--check-queries` ignores
-output freshness entirely; the sibling `--check-stale` (or `--check` for both) is
-what guards a committed `queries.gen.ts` in the typed lane.
+Run these commands from this directory; all write nothing:
+
+| Command | Flags | Checks |
+| --- | --- | --- |
+| `bun run check:queries` | `--check-queries` | Queries plan against the schema; errors point at the file and line. |
+| `bun run check:stale` | `--check-stale` | Generated types match the current queries and schema. |
+| `bun run check:migration-order` | `--check-queries --check-migration-order '^\d+'` | Queries are valid and migration prefixes are present, unique, and the same width. |
+| `bun run check` | `--check` | Query validity and generated-type freshness. |
+
+`check:stale` and `check` fail here because `queries.gen.ts` is intentionally absent;
+use them in the typed lane. `--check` doesn't include migration order. The
+migration-order command adds `--check-queries` to avoid generating types.
