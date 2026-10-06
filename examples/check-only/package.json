@@ -3,7 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check": "bun-sqlgen generate 'src/**/*.ts' --migrations src/db/migrations --check",
     "check:queries": "bun-sqlgen generate 'src/**/*.ts' --migrations src/db/migrations --check-queries",
+    "check:stale": "bun-sqlgen generate 'src/**/*.ts' --migrations src/db/migrations --check-stale",
+    "check:migration-order": "bun-sqlgen generate 'src/**/*.ts' --migrations src/db/migrations --check-queries --check-migration-order '^\\d+'",
     "check:types": "bun run check:queries && bun run --bun tsc"
   },
   "devDependencies": {
