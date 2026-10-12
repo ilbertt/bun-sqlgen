@@ -27,6 +27,9 @@ After finishing an implementation, always run:
 
 Check `package.json` scripts (root and per-package) for other available commands.
 
+Regression tests use Bun's built-in runner and live beside source as `*.test.ts`;
+published library builds exclude them. Run `bun test` when changing generator behavior.
+
 ## Run scripts
 
 When running a script, always check `package.json` scripts (root and per-package) for available commands first.

@@ -125,6 +125,32 @@ View columns are all nullable — nothing tracks `NOT NULL` through a view defin
 
 `--no-schema` (or `schema: false` in `sqlgen.config.ts`) leaves the block out.
 
+For Postgres, select which schemas contribute table and view interfaces, the `Tables`
+registry, and the runtime `schema` value:
+
+```ts
+import { defineConfig } from '@ilbertt/bun-sqlgen/config';
+
+export default defineConfig({
+  schemas: ['nibrun'],
+});
+```
+
+Omitting `schemas` includes all non-system schemas; `schemas: []` emits no schema
+block. The CLI's `--schemas nibrun,public` overrides the config list. Names are exact,
+case-sensitive PostgreSQL schema names. This option is unavailable for SQLite.
+
+All migrations still run, and every named query is validated and typed against the
+complete database, including excluded relations. Foreign keys on included relations
+retain their metadata even when the referenced relation is excluded. Queries reading
+excluded relations keep their result types, emitted directly when their source column
+is absent from the schema block. `schema: false` and `--no-schema` disable the entire
+block regardless of the allowlist.
+
+The emitted registry still uses bare relation names. Filtering happens before
+same-named relations are collapsed; if multiple selected schemas contain the same
+relation name, the last schema in alphabetical order supplies its registry entry.
+
 ## CLI
 
 ```sh

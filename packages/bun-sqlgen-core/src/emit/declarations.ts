@@ -46,7 +46,7 @@ export function schemaIndex(tables: EmitTable[]): SchemaIndex {
   const bases = uniqueBases(tables);
   return new Map(
     tables.map((table) => [
-      table.name,
+      table.source ?? table.name,
       {
         base: bases.get(table.name)!,
         columns: new Map(table.columns.map((column) => [column.name, column])),
@@ -314,7 +314,7 @@ export function schemaDeclarations(input: {
   const statements: ts.Statement[] = [];
 
   for (const table of tables) {
-    const base = schema.get(table.name)!.base;
+    const base = schema.get(table.source ?? table.name)!.base;
 
     const columns = f.createInterfaceDeclaration(
       [exported()],
@@ -374,7 +374,7 @@ export function schemaDeclarations(input: {
           undefined,
           propertyName(table.name),
           undefined,
-          f.createTypeReferenceNode(tableName(schema.get(table.name)!.base)),
+          f.createTypeReferenceNode(tableName(schema.get(table.source ?? table.name)!.base)),
         ),
       ),
     ),

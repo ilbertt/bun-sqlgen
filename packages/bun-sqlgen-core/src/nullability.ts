@@ -144,11 +144,10 @@ export function resolveTableColumns(input: {
   columnOverrides: ColumnOverrides;
   viewColumns: ViewColumns;
 }): EmitColumn[] {
-  const overrides = input.columnOverrides[input.table.name] ?? {};
+  const relation = input.table.source ?? input.table.name;
+  const overrides = input.columnOverrides[relation] ?? {};
   // What each column passes through, for a view; a table passes through nothing.
-  const passThrough = new Map(
-    (input.viewColumns[input.table.name] ?? []).map((c) => [c.column, c.source]),
-  );
+  const passThrough = new Map((input.viewColumns[relation] ?? []).map((c) => [c.column, c.source]));
   return input.table.columns.map((column): EmitColumn => {
     const source = passThrough.get(column.name);
     const comment = layerComment({

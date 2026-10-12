@@ -9,5 +9,5 @@
     "rootDir": "./src"
   },
   "include": ["src"],
-  "exclude": ["node_modules", "pkg", "src/cli"]
+  "exclude": ["node_modules", "pkg", "src/cli", "src/**/*.test.ts"]
 }

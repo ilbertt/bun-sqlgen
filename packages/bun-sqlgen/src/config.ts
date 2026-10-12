@@ -37,6 +37,8 @@ interface BaseConfig {
 /** Postgres config: introspection runs against an in-process PGlite. */
 export interface PostgresConfig extends BaseConfig {
   dialect?: 'postgres';
+  /** Schemas whose relations are emitted. Omit for all non-system schemas; ignored by `schema: false`. */
+  schemas?: string[];
   /** PGlite extensions to load before applying migrations. */
   extensions?: () => Extensions | Promise<Extensions>;
 }
@@ -44,6 +46,7 @@ export interface PostgresConfig extends BaseConfig {
 /** SQLite config: introspection runs against an in-memory `bun:sqlite` database. */
 export interface SqliteConfig extends BaseConfig {
   dialect: 'sqlite';
+  schemas?: never;
 }
 
 /** `sqlgen.config.ts` — shapes the throwaway introspection DB to match production. */

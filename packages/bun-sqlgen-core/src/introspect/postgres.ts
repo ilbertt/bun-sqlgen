@@ -1,6 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
 import { applyMigrations } from '#introspect/migrations.ts';
-import { parseRelations } from '#introspect/sql-text.ts';
+import { parseRelations, quoteIdent } from '#introspect/sql-text.ts';
 import { oidToTs, PG_OID } from '#oids.ts';
 import type {
   Catalog,
@@ -80,7 +80,14 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
       fields,
       provenance,
       relations,
-      views: parseRelations(sql).filter((r) => knownViews.has(r)),
+      views: [
+        ...new Set(
+          parseRelations({ sql, qualified: true }).flatMap((r) => {
+            const view = knownViews.get(r);
+            return view ? [view] : [];
+          }),
+        ),
+      ],
     };
   }
 
@@ -90,9 +97,9 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
   // an expression — exactly the distinction that decides how a comment on it matches.
   async function viewColumns(): Promise<ViewColumns> {
     const map: ViewColumns = Object.create(null);
-    for (const [name, qualified] of await getViews()) {
+    for (const name of new Set((await getViews()).values())) {
       try {
-        const described = await describe(`SELECT * FROM ${qualified}`);
+        const described = await describe(`SELECT * FROM ${name}`);
         // biome-ignore lint/complexity/useMaxParams: native map callback needs the index
         map[name] = described.fields.map((field, i) => ({
           column: field.name,
@@ -106,19 +113,18 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
   }
 
   // Per-column NOT NULL — the piece describeQuery can't give us.
-  // Relation and column names come from the schema, and `__proto__` is a legal one:
-  // on an ordinary object it is the prototype accessor, so `map[name] ??= …` never
-  // assigns and the later `.push`/lookup fails. A null-prototype record has no such key.
+  // Column names can be `__proto__`, so the records must have no prototype accessor.
   async function catalog(): Promise<Catalog> {
     const r = await db.query<CatalogRow>(`
-      SELECT table_name, column_name, (is_nullable = 'NO') AS not_null
+      SELECT table_schema AS schema_name, table_name, column_name, (is_nullable = 'NO') AS not_null
       FROM information_schema.columns
       WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
     `);
     const map: Catalog = Object.create(null);
     for (const row of r.rows) {
-      map[row.table_name] ??= Object.create(null);
-      map[row.table_name]![row.column_name] = row.not_null;
+      const name = qualified(row);
+      map[name] ??= Object.create(null);
+      map[name]![row.column_name] = row.not_null;
     }
     return map;
   }
@@ -127,7 +133,7 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
   // `@notNull`/`@nullable`/`@type` overrides once, instead of per query.
   async function columnComments(): Promise<RawColumnComments> {
     const r = await db.query<CommentRow>(`
-      SELECT c.relname AS table_name, a.attname AS column_name, d.description
+      SELECT n.nspname AS schema_name, c.relname AS table_name, a.attname AS column_name, d.description
       FROM pg_description d
       JOIN pg_class c ON c.oid = d.objoid
       JOIN pg_attribute a ON a.attrelid = d.objoid AND a.attnum = d.objsubid
@@ -136,8 +142,9 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
     `);
     const map: RawColumnComments = Object.create(null);
     for (const row of r.rows) {
-      map[row.table_name] ??= Object.create(null);
-      map[row.table_name]![row.column_name] = row.description;
+      const name = qualified(row);
+      map[name] ??= Object.create(null);
+      map[name]![row.column_name] = row.description;
     }
     return map;
   }
@@ -179,11 +186,16 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
     `);
     const byRelation = new Map<string, SchemaTable>();
     const byColumn = new Map<string, SchemaColumn>();
+    const schemas = opts.schemas === undefined ? undefined : new Set(opts.schemas);
     for (const row of cols.rows) {
+      if (schemas && !schemas.has(row.schema_name)) {
+        continue;
+      }
       let table = byRelation.get(qualified(row));
       if (!table) {
         table = {
           name: row.table_name,
+          source: qualified(row),
           kind: RELATION_KIND[row.relkind] ?? 'table',
           columns: [],
           indexes: [],
@@ -256,8 +268,7 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
       });
     }
 
-    // The rest of the pipeline keys relations by bare name (as `catalog()` does), so a
-    // table shadowed by a same-named one in another schema collapses onto the last seen.
+    // Keep the existing bare-name registry, collapsing only among included relations.
     return [...new Map([...byRelation.values()].map((t) => [t.name, t])).values()];
   }
 
@@ -277,28 +288,28 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
 const passThrough = (prov: Provenance | undefined): ColumnSource | undefined =>
   prov?.kind === 'column' && prov.table ? { table: prov.table, column: prov.column } : undefined;
 
-// Plain views only, keyed by the bare name the rest of the pipeline uses and valued by
-// the qualified one it takes to select from them unambiguously.
+// Qualified names identify every view; visible bare names follow the database's search_path.
 async function loadViews(db: PGlite): Promise<Map<string, string>> {
   const r = await db.query<ViewRow>(`
-    SELECT n.nspname AS schema_name, c.relname AS table_name
+    SELECT n.nspname AS schema_name, c.relname AS table_name, pg_table_is_visible(c.oid) AS visible
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE c.relkind = 'v' AND n.nspname NOT IN ('pg_catalog', 'information_schema')
     ORDER BY n.nspname, c.relname
   `);
-  return new Map(
-    r.rows.map((row) => [
-      row.table_name,
-      `${quoteIdent(row.schema_name)}.${quoteIdent(row.table_name)}`,
-    ]),
-  );
+  const map = new Map<string, string>();
+  for (const row of r.rows) {
+    const name = qualified(row);
+    map.set(name, name);
+    if (row.visible) {
+      map.set(row.table_name, name);
+    }
+  }
+  return map;
 }
 
-const quoteIdent = (s: string): string => `"${s.replace(/"/g, '""')}"`;
-
 const qualified = (row: { schema_name: string; table_name: string }): string =>
-  `${row.schema_name}.${row.table_name}`;
+  `${quoteIdent(row.schema_name)}.${quoteIdent(row.table_name)}`;
 
 // Dynamic OIDs (enum/domain/array) a static table can't know: read their
 // labels/base/element from the catalog so the mapper can recurse to a leaf.
@@ -340,6 +351,7 @@ async function loadTypes(db: PGlite): Promise<TypeCatalog> {
 
 interface PlanNode {
   'Relation Name'?: string;
+  Schema?: string;
   Alias?: string;
   'Join Type'?: string;
   Output?: string[];
@@ -351,12 +363,14 @@ interface ExplainRow {
 }
 
 interface CatalogRow {
+  schema_name: string;
   table_name: string;
   column_name: string;
   not_null: boolean;
 }
 
 interface CommentRow {
+  schema_name: string;
   table_name: string;
   column_name: string;
   description: string;
@@ -365,6 +379,7 @@ interface CommentRow {
 interface ViewRow {
   schema_name: string;
   table_name: string;
+  visible: boolean;
 }
 
 interface WritableRow {
@@ -477,7 +492,9 @@ function analyzePlan(input: { plan: PlanNode; fieldCount: number }): {
   const walk = (node: PlanNode, underOuter: boolean): void => {
     const relation = node['Relation Name'];
     if (relation && node.Alias) {
-      aliasToRel[node.Alias] = relation;
+      aliasToRel[node.Alias] = node.Schema
+        ? qualified({ schema_name: node.Schema, table_name: relation })
+        : relation;
       if (underOuter) {
         nullableAliases.add(node.Alias);
       }

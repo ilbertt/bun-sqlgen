@@ -50,6 +50,8 @@ export type RelationKind = 'table' | 'view' | 'materialized_view';
  */
 export interface Table<Column> {
   name: string;
+  /** Catalog identity when it differs from the emitted name (schema-qualified in Postgres). */
+  source?: string;
   kind: RelationKind;
   columns: Column[];
   indexes: string[];
@@ -205,6 +207,8 @@ export interface Introspector {
 
 export interface IntrospectorOptions {
   dialect: Dialect;
+  /** Postgres only: schemas whose relations contribute to the schema block. */
+  schemas?: string[];
   migrationsDir: string;
   prelude?: string;
   transformMigration?: (input: { sql: string; filename: string }) => string;
