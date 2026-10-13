@@ -136,20 +136,13 @@ export default defineConfig({
 });
 ```
 
-Omitting `schemas` includes all non-system schemas; `schemas: []` emits no schema
-block. The CLI's `--schemas nibrun,public` overrides the config list. Names are exact,
-case-sensitive PostgreSQL schema names. This option is unavailable for SQLite.
-
-All migrations still run, and every named query is validated and typed against the
-complete database, including excluded relations. Foreign keys on included relations
-retain their metadata even when the referenced relation is excluded. Queries reading
-excluded relations keep their result types, emitted directly when their source column
-is absent from the schema block. `schema: false` and `--no-schema` disable the entire
-block regardless of the allowlist.
-
-The emitted registry still uses bare relation names. Filtering happens before
-same-named relations are collapsed; if multiple selected schemas contain the same
-relation name, the last schema in alphabetical order supplies its registry entry.
+Omitting `schemas` includes all non-system schemas; `[]` emits no schema block.
+The CLI's `--schemas nibrun,public` overrides the list.
+Names are case-sensitive. This option is Postgres-only;
+`schema: false` / `--no-schema` disables the whole block.
+All migrations and query typing still use the complete database, and included
+relations retain foreign keys to excluded ones. Registry keys remain bare relation
+names; collisions among selected schemas keep the last schema in alphabetical order.
 
 ## CLI
 
