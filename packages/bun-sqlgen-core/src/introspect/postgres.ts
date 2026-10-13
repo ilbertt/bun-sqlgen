@@ -186,9 +186,9 @@ export async function createPostgresIntrospector(opts: IntrospectorOptions): Pro
     `);
     const byRelation = new Map<string, SchemaTable>();
     const byColumn = new Map<string, SchemaColumn>();
-    const schemas = opts.schemas === undefined ? undefined : new Set(opts.schemas);
+    const dbSchemas = opts.dbSchemas === undefined ? undefined : new Set(opts.dbSchemas);
     for (const row of cols.rows) {
-      if (schemas && !schemas.has(row.schema_name)) {
+      if (dbSchemas && !dbSchemas.has(row.schema_name)) {
         continue;
       }
       let table = byRelation.get(qualified(row));

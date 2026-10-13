@@ -63,7 +63,7 @@ export interface GenerateOptions {
    */
   schema?: boolean;
   /** Postgres only: schemas to emit. Overrides config; omitted means all non-system schemas. */
-  schemas?: IntrospectorOptions['schemas'];
+  dbSchemas?: IntrospectorOptions['dbSchemas'];
 }
 
 /** Settings for the migration-order check; its presence is what turns the check on. */
@@ -135,13 +135,13 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   // Explicit `--dialect` wins over config; default Postgres. Extensions are a
   // PGlite (Postgres) concept; a SQLite config carries none.
   const dialect = options.dialect ?? config.dialect ?? 'postgres';
-  const schemas = options.schemas ?? config.schemas;
-  if (dialect !== 'postgres' && schemas !== undefined) {
-    throw new Error('schemas is only supported for the postgres dialect');
+  const dbSchemas = options.dbSchemas ?? config.dbSchemas;
+  if (dialect !== 'postgres' && dbSchemas !== undefined) {
+    throw new Error('dbSchemas is only supported for the postgres dialect');
   }
   const intro = await createIntrospector({
     dialect,
-    schemas,
+    dbSchemas,
     migrationsDir,
     prelude: config.prelude,
     transformMigration: config.transformMigration,

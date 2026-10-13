@@ -208,7 +208,7 @@ export interface Introspector {
 export interface IntrospectorOptions {
   dialect: Dialect;
   /** Postgres only: schemas whose relations contribute to the schema block. */
-  schemas?: string[];
+  dbSchemas?: string[];
   migrationsDir: string;
   prelude?: string;
   transformMigration?: (input: { sql: string; filename: string }) => string;

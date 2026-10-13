@@ -43,7 +43,7 @@ function resultTypes(input: { cwd: string; out: string }): Record<string, Record
 test(
   'schema filtering preserves cross-schema foreign keys and query types',
   async () => {
-    const cwd = mkdtempSync(join(import.meta.dir, '.schemas-test-'));
+    const cwd = mkdtempSync(join(import.meta.dir, '.db-schemas-test-'));
     const options = {
       cwd,
       queries: 'queries.ts',
@@ -80,7 +80,7 @@ test(
       sql.Joined\`SELECT a.id AS app_id, b.id AS auth_id
         FROM app.items a LEFT JOIN auth.items b ON b.id = a.owner_id\`;`;
       writeFileSync(join(cwd, 'queries.ts'), queries);
-      writeFileSync(join(cwd, 'sqlgen.config.ts'), "export default { schemas: ['app'] };\n");
+      writeFileSync(join(cwd, 'sqlgen.config.ts'), "export default { dbSchemas: ['app'] };\n");
       const filtered = { ...options, out: 'filtered.gen.ts' };
       expect((await generate(filtered)).failures).toEqual([]);
       const { schema } = await import(join(cwd, filtered.out));
@@ -100,36 +100,38 @@ test(
       expect(resultTypes(filtered)).toEqual(expected);
       for (const settings of [
         { out: 'all.gen.ts', config: {} },
-        { out: 'none.gen.ts', config: { schemas: [] } },
-        { out: 'disabled.gen.ts', config: { schemas: ['app'], schema: false } },
+        { out: 'none.gen.ts', config: { dbSchemas: [] } },
+        { out: 'disabled.gen.ts', config: { dbSchemas: ['app'], schema: false } },
       ]) {
         const configPath = join(cwd, `${settings.out}.config.ts`);
         writeFileSync(configPath, `export default ${JSON.stringify(settings.config)};\n`);
         await generate({ ...options, out: settings.out, configPath });
         expect(resultTypes({ cwd, out: settings.out })).toEqual(expected);
       }
-      const cli = Bun.spawn(
-        [
-          process.execPath,
-          resolve(import.meta.dir, '../../bun-sqlgen/src/cli/main.ts'),
-          'generate',
-          'queries.ts',
-          '--migrations',
-          'migrations',
-          '--out',
-          'cli.gen.ts',
-          '--package',
-          '@repo/bun-sqlgen',
-          '--schemas',
-          'auth',
-        ],
-        { cwd, stdout: 'ignore', stderr: 'inherit' },
-      );
-      expect(await cli.exited).toBe(0);
-      expect(Object.keys((await import(join(cwd, 'cli.gen.ts'))).schema)).toEqual([
-        'items',
-        'labels',
-      ]);
+      for (const disabled of [false, true]) {
+        const out = `cli-${disabled}.gen.ts`;
+        const cli = Bun.spawn(
+          [
+            process.execPath,
+            resolve(import.meta.dir, '../../bun-sqlgen/src/cli/main.ts'),
+            'generate',
+            'queries.ts',
+            '--migrations',
+            'migrations',
+            '--out',
+            out,
+            '--package',
+            '@repo/bun-sqlgen',
+            '--db-schemas',
+            'auth',
+            ...(disabled ? ['--no-schema'] : []),
+          ],
+          { cwd, stdout: 'ignore', stderr: 'inherit' },
+        );
+        expect(await cli.exited).toBe(0);
+        const { schema } = await import(join(cwd, out));
+        expect(schema && Object.keys(schema)).toEqual(disabled ? undefined : ['items', 'labels']);
+      }
       writeFileSync(
         join(cwd, 'queries.ts'),
         `${queries}\nsql.Invalid\`SELECT missing FROM auth.items\`;`,
@@ -138,7 +140,7 @@ test(
         (await generate({ ...filtered, checkQueries: true })).failures.map((f) => f.name),
       ).toEqual(['Invalid']);
       await expect(generate({ ...filtered, dialect: 'sqlite' })).rejects.toThrow(
-        'schemas is only supported for the postgres dialect',
+        'dbSchemas is only supported for the postgres dialect',
       );
       writeFileSync(join(cwd, 'queries.ts'), 'export {};\n');
       await generate({ ...filtered, configPath: join(cwd, 'none.gen.ts.config.ts') });

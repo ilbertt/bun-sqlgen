@@ -132,14 +132,14 @@ registry, and the runtime `schema` value:
 import { defineConfig } from '@ilbertt/bun-sqlgen/config';
 
 export default defineConfig({
-  schemas: ['public'],
+  dbSchemas: ['public'],
 });
 ```
 
-Omitting `schemas` includes all non-system schemas; `[]` emits no schema block.
-The CLI's `--schemas public,auth` overrides the list.
-Names are case-sensitive. This option is Postgres-only;
-`schema: false` / `--no-schema` disables the whole block.
+Omitting `dbSchemas` includes all non-system schemas; `[]` emits no schema block.
+The CLI's `--db-schemas public,auth` overrides the list. Names are case-sensitive.
+`dbSchemas` selects PostgreSQL database namespaces; `schema: false` / `--no-schema`
+disables the entire generated schema block, including types and runtime values.
 All migrations and query typing still use the complete database, and included
 relations retain foreign keys to excluded ones. Registry keys remain bare relation
 names; collisions among selected schemas keep the last schema in alphabetical order.
