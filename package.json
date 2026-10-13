@@ -17,7 +17,7 @@
     ],
     "catalog": {
       "@electric-sql/pglite": "^0.5.8",
-      "@types/bun": "1.4.2",
+      "@types/bun": "1.4.3",
       "@typescript/typescript6": "^6.0.2",
       "typescript": "^7.0.2",
       "zod": "^4.6.5"
@@ -33,5 +33,5 @@
     "typescript": "catalog:",
     "turbo": "^2.11.6"
   },
-  "packageManager": "bun@1.4.2"
+  "packageManager": "bun@1.4.3"
 }
