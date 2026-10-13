@@ -125,25 +125,6 @@ View columns are all nullable — nothing tracks `NOT NULL` through a view defin
 
 `--no-schema` (or `schema: false` in `sqlgen.config.ts`) leaves the block out.
 
-For Postgres, select which schemas contribute table and view interfaces, the `Tables`
-registry, and the runtime `schema` value:
-
-```ts
-import { defineConfig } from '@ilbertt/bun-sqlgen/config';
-
-export default defineConfig({
-  dbSchemas: ['public'],
-});
-```
-
-Omitting `dbSchemas` includes all non-system schemas; `[]` emits no schema block.
-The CLI's `--db-schemas public,auth` overrides the list. Names are case-sensitive.
-`dbSchemas` selects PostgreSQL database namespaces; `schema: false` / `--no-schema`
-disables the entire generated schema block, including types and runtime values.
-All migrations and query typing still use the complete database, and included
-relations retain foreign keys to excluded ones. Registry keys remain bare relation
-names; collisions among selected schemas keep the last schema in alphabetical order.
-
 ## CLI
 
 ```sh
@@ -258,6 +239,22 @@ A runnable walkthrough of all three fields lives in the
 [`with-config` example](https://github.com/ilbertt/bun-sqlgen/tree/main/examples/with-config).
 `extensions` is Postgres-only; `prelude` and `transformMigration` apply to both
 dialects, and `dialect: 'sqlite'` selects SQLite (the `--dialect` flag overrides it).
+
+For PostgreSQL, `dbSchemas` limits exported relations to selected database namespaces:
+
+```ts
+import { defineConfig } from '@ilbertt/bun-sqlgen/config';
+
+export default defineConfig({
+  dbSchemas: ['public'],
+});
+```
+
+Omitting `dbSchemas` selects all non-system schemas; `[]` selects none.
+The CLI's `--db-schemas public,auth` overrides the list. Names are case-sensitive.
+All migrations and query typing still use the complete database, and included
+relations retain foreign keys to excluded ones. Registry keys remain bare relation
+names; collisions among selected schemas keep the last schema in alphabetical order.
 
 ## Naming
 
