@@ -132,12 +132,12 @@ registry, and the runtime `schema` value:
 import { defineConfig } from '@ilbertt/bun-sqlgen/config';
 
 export default defineConfig({
-  schemas: ['nibrun'],
+  schemas: ['public'],
 });
 ```
 
 Omitting `schemas` includes all non-system schemas; `[]` emits no schema block.
-The CLI's `--schemas nibrun,public` overrides the list.
+The CLI's `--schemas public,auth` overrides the list.
 Names are case-sensitive. This option is Postgres-only;
 `schema: false` / `--no-schema` disables the whole block.
 All migrations and query typing still use the complete database, and included
