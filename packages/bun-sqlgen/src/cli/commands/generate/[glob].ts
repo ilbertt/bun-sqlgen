@@ -53,6 +53,15 @@ export const command = defineCommand('generate [glob]', {
       schema: z.enum(['postgres', 'sqlite']).optional(),
       description: 'Database engine to introspect against (default postgres; overrides config).',
     },
+    'db-schemas': {
+      schema: z
+        .string()
+        .transform((value) => value.split(',').map((name) => name.trim()))
+        .pipe(z.array(z.string().min(1)))
+        .optional(),
+      description:
+        'Postgres database schemas to include, comma-separated (default all non-system schemas; overrides config).',
+    },
     check: {
       schema: z.boolean().optional(),
       description: 'Run all checks (queries + stale types); writes nothing — the CI default.',
@@ -74,6 +83,7 @@ export const command = defineCommand('generate [glob]', {
       packageName: options.package,
       configPath: options.config,
       dialect: options.dialect,
+      dbSchemas: options['db-schemas'],
       // Absent, the config decides — including whether the check runs at all.
       checkMigrationOrder: options['check-migration-order']
         ? { prefixPattern: toPrefixPattern(options['check-migration-order']) }

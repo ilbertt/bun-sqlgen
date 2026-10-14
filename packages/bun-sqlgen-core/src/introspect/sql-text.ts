@@ -28,6 +28,8 @@ export function unquoteIdent(s: string): string {
   return s;
 }
 
+export const quoteIdent = (s: string): string => `"${s.replace(/"/g, '""')}"`;
+
 const RELATION_REF = new RegExp(
   String.raw`\b(?:from|join|update|into)\s+(${IDENT})(?:\s*\.\s*(${IDENT}))?`,
   'gi',
@@ -38,10 +40,13 @@ const RELATION_REF = new RegExp(
  * Subqueries (whose next token is `(`) don't match; CTE names that slip through simply
  * miss in the catalog.
  */
-export function parseRelations(sql: string): string[] {
+export function parseRelations(input: string | { sql: string; qualified: boolean }): string[] {
+  const sql = typeof input === 'string' ? input : input.sql;
+  const qualified = typeof input !== 'string' && input.qualified;
   const out = new Set<string>();
   for (const m of stripNoise(sql).matchAll(RELATION_REF)) {
-    out.add(unquoteIdent(m[2] ?? m[1]!)); // `schema.table` → table
+    const name = unquoteIdent(m[2] ?? m[1]!);
+    out.add(qualified && m[2] ? `${quoteIdent(unquoteIdent(m[1]!))}.${quoteIdent(name)}` : name);
   }
   return [...out];
 }

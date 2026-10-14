@@ -240,6 +240,22 @@ A runnable walkthrough of all three fields lives in the
 `extensions` is Postgres-only; `prelude` and `transformMigration` apply to both
 dialects, and `dialect: 'sqlite'` selects SQLite (the `--dialect` flag overrides it).
 
+For PostgreSQL, `dbSchemas` limits exported relations to selected database namespaces:
+
+```ts
+import { defineConfig } from '@ilbertt/bun-sqlgen/config';
+
+export default defineConfig({
+  dbSchemas: ['public'],
+});
+```
+
+Omitting `dbSchemas` selects all non-system schemas; `[]` selects none.
+The CLI's `--db-schemas public,auth` overrides the list. Names are case-sensitive.
+All migrations and query typing still use the complete database, and included
+relations retain foreign keys to excluded ones. Registry keys remain bare relation
+names; collisions among selected schemas keep the last schema in alphabetical order.
+
 ## Naming
 
 A query's name is the **property you tag it with** — `` sql.GetUser`...` `` — and

@@ -62,6 +62,8 @@ export interface GenerateOptions {
    * constraint names. Overrides config; defaults to `true`.
    */
   schema?: boolean;
+  /** Postgres only: schemas to emit. Overrides config; omitted means all non-system schemas. */
+  dbSchemas?: IntrospectorOptions['dbSchemas'];
 }
 
 /** Settings for the migration-order check; its presence is what turns the check on. */
@@ -133,8 +135,13 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   // Explicit `--dialect` wins over config; default Postgres. Extensions are a
   // PGlite (Postgres) concept; a SQLite config carries none.
   const dialect = options.dialect ?? config.dialect ?? 'postgres';
+  const dbSchemas = options.dbSchemas ?? config.dbSchemas;
+  if (dialect !== 'postgres' && dbSchemas !== undefined) {
+    throw new Error('dbSchemas is only supported for the postgres dialect');
+  }
   const intro = await createIntrospector({
     dialect,
+    dbSchemas,
     migrationsDir,
     prelude: config.prelude,
     transformMigration: config.transformMigration,
@@ -232,7 +239,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   let changed = false;
   // The module carries the schema block as well as the query types, so it is worth
   // writing for either one alone.
-  if (typed > 0 || tables.length > 0) {
+  if (typed > 0 || tables.length > 0 || safeRead(outPath)?.includes(GENERATED_MARKER)) {
     const contents = emitModule({
       queries: emitModels,
       tables,
