@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.7.0] - 2026-10-14
+
+### 🚀 Features
+
+- [**breaking**] Allow filtering generated PostgreSQL schema exports (#50)
+
+### 📚 Documentation
+
+- *(examples)* Demonstrate all check flags (#47)
+
+### ⚙️ Miscellaneous Tasks
+
+- Read Bun version from package.json (#46)
+
 ## [0.6.3] - 2026-10-01
 
 ### 🚜 Refactor
